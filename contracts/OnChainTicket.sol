@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: UNLICENSED
+// SPDX-License-Identifier: MIT
 
 /*This smart contract will do the following:
 Collect Integration and Collaboration proposals for TRON/BTTC ecosystem and use a basic voting system for anyone with a BTTC wallet to vote by:
