@@ -4,13 +4,13 @@
 Collect Integration and Collaboration proposals for TRON/BTTC ecosystem and use a basic voting system for anyone with a BTTC wallet to vote by:
 
 1) Add new Integration proposal and attach unique ID to it --> Done
-2) Vote for any integration proposal based on unique ID --> To-Do
+2) Vote for any integration proposal based on unique ID --> Done
 3) Remove spam or scam integration proposal (Contract owner only) -> Done
 4) Add TRON ecosystem Problem Reports --> Done
 5) Remove TRON ecosystem Problem Reports (Contract owner only) --> Done
-6) Upvote for Problem Reports
-7) Get contributors Address list
-8) Modify ticket Status
+6) Upvote for Problem Reports --> Done
+7) Get contributors Address list --> Done
+8) Modify ticket Status --> Done
 
 BTTickets v1 Contract
 */
@@ -37,6 +37,7 @@ contract OnchainTicket is Ownable {
         string description; //Ticket description
         uint8 status; //Ticket Status(Suggested): 0: New, 1: Under Analysis, 2: Defered, 3: Done, 4: Rejected
         uint16 voteCount; //Ticket vote Counter
+        address raisedBy;   //This variable will store the address of the ticketOwner
     }
 
     Ticket[] public listOfIntegrations; //Array to store all Integrations
@@ -48,15 +49,15 @@ contract OnchainTicket is Ownable {
     mapping(uint128 => uint8) public getIssueStatusFromID;
 
     constructor() Ownable(msg.sender) {
-        integrationIndex = 1; //Initialize integration index so we can start unique IDs from 1
-        issueIndex = 1; //Initialize issue indexso we can start unique IDs from 1
+        integrationIndex = 0; //Initialize integration index so we can start unique IDs from 1
+        issueIndex = 0; //Initialize Problem Report index we can start unique IDs from 1
     }
 
     function addNewIntegration(string memory _projectName, string memory _description) external {
         string memory strUniqueID = Strings.toString(integrationIndex);
         strUniqueID = string.concat("IR-", strUniqueID);
         listOfIntegrations.push(
-            Ticket(strUniqueID, _projectName, _description, NEW,0)
+            Ticket(strUniqueID, _projectName, _description, NEW,0,msg.sender)
         );
 
         getProjectFromID[integrationIndex] = _projectName;
@@ -67,7 +68,7 @@ contract OnchainTicket is Ownable {
         string memory strUniqueID = Strings.toString(issueIndex);
         strUniqueID = string.concat("PR-", strUniqueID);
         listOfIssues.push(
-            Ticket(strUniqueID, _issueTitle, _issueDescription, NEW,0)
+            Ticket(strUniqueID, _issueTitle, _issueDescription, NEW,0,msg.sender)
         );
 
         getIssueTitleFromID[issueIndex] = _issueTitle;
