@@ -218,6 +218,11 @@
 						"internalType": "uint8",
 						"name": "status",
 						"type": "uint8"
+					},
+					{
+						"internalType": "uint16",
+						"name": "voteCount",
+						"type": "uint16"
 					}
 				],
 				"stateMutability": "view",
@@ -252,6 +257,11 @@
 						"internalType": "uint8",
 						"name": "status",
 						"type": "uint8"
+					},
+					{
+						"internalType": "uint16",
+						"name": "voteCount",
+						"type": "uint16"
 					}
 				],
 				"stateMutability": "view",
@@ -284,6 +294,19 @@
 				"type": "function"
 			},
 			{
+				"inputs": [
+					{
+						"internalType": "uint8",
+						"name": "_problemReportIndex",
+						"type": "uint8"
+					}
+				],
+				"name": "removeProblemReport",
+				"outputs": [],
+				"stateMutability": "nonpayable",
+				"type": "function"
+			},
+			{
 				"inputs": [],
 				"name": "renounceOwnership",
 				"outputs": [],
@@ -299,6 +322,37 @@
 					}
 				],
 				"name": "transferOwnership",
+				"outputs": [],
+				"stateMutability": "nonpayable",
+				"type": "function"
+			},
+			{
+				"inputs": [
+					{
+						"internalType": "uint8",
+						"name": "_problemReportIndex",
+						"type": "uint8"
+					}
+				],
+				"name": "upVotePR",
+				"outputs": [],
+				"stateMutability": "nonpayable",
+				"type": "function"
+			},
+			{
+				"inputs": [
+					{
+						"internalType": "uint8",
+						"name": "_problemReportIndex",
+						"type": "uint8"
+					},
+					{
+						"internalType": "uint8",
+						"name": "_newStatus",
+						"type": "uint8"
+					}
+				],
+				"name": "updatePRStatus",
 				"outputs": [],
 				"stateMutability": "nonpayable",
 				"type": "function"
@@ -394,11 +448,11 @@
 			]
 		},
 		"contracts/OnChainTicket.sol": {
-			"keccak256": "0xbdc11a774403f49a2df990348408495beea6d14b3644002a891b87708a93690e",
+			"keccak256": "0xb6809aa5c6a98dcf438042be54924b0c660f57d16fe5cb80e3f4f040eec25bf0",
 			"license": "UNLICENSED",
 			"urls": [
-				"bzz-raw://d3ba9b4dadef3c0ad452525936fc44d228b8da0aec79e4a93bee06636a551df8",
-				"dweb:/ipfs/QmPHj3ovMiGRvKLMnCqXqR7WRKVPe7pEUhBaKMqgo1ebtd"
+				"bzz-raw://0ba61fc7c826e29acd5f1a6310140b6223e19d221698f105f15124e18943e65e",
+				"dweb:/ipfs/QmVyRXguiBrinNVq51MJ45WfVqXnVhGdktCR9BB7qkUpda"
 			]
 		}
 	},

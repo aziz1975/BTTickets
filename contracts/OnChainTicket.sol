@@ -3,15 +3,16 @@
 /*This smart contract will do the following:
 Collect Integration and Collaboration proposals for TRON/BTTC ecosystem and use a basic voting system for anyone with a BTTC wallet to vote by:
 
-1) Add new Integration proposal and attach unique ID to it
-2) Vote for any integration proposal based on unique ID
-3) Remove spam or scam integration proposal (Contract owner only)
-4) Add TRON ecosystem issue
-5) Remove TRON ecosystem issue (Contract owner only)
-6) Upvote for issue
+1) Add new Integration proposal and attach unique ID to it --> Done
+2) Vote for any integration proposal based on unique ID --> To-Do
+3) Remove spam or scam integration proposal (Contract owner only) -> Done
+4) Add TRON ecosystem Problem Reports --> Done
+5) Remove TRON ecosystem Problem Reports (Contract owner only) --> Done
+6) Upvote for Problem Reports
 7) Get contributors Address list
 8) Modify ticket Status
 
+BTTickets v1 Contract
 */
 pragma solidity ^0.8.19;
 
@@ -35,6 +36,7 @@ contract OnchainTicket is Ownable {
         string title; //Ticket Title
         string description; //Ticket description
         uint8 status; //Ticket Status(Suggested): 0: New, 1: Under Analysis, 2: Defered, 3: Done, 4: Rejected
+        uint16 voteCount; //Ticket vote Counter
     }
 
     Ticket[] public listOfIntegrations; //Array to store all Integrations
@@ -50,14 +52,11 @@ contract OnchainTicket is Ownable {
         issueIndex = 1; //Initialize issue indexso we can start unique IDs from 1
     }
 
-    function addNewIntegration(
-        string memory _projectName,
-        string memory _description
-    ) external {
+    function addNewIntegration(string memory _projectName, string memory _description) external {
         string memory strUniqueID = Strings.toString(integrationIndex);
         strUniqueID = string.concat("IR-", strUniqueID);
         listOfIntegrations.push(
-            Ticket(strUniqueID, _projectName, _description, NEW)
+            Ticket(strUniqueID, _projectName, _description, NEW,0)
         );
 
         getProjectFromID[integrationIndex] = _projectName;
@@ -68,7 +67,7 @@ contract OnchainTicket is Ownable {
         string memory strUniqueID = Strings.toString(issueIndex);
         strUniqueID = string.concat("PR-", strUniqueID);
         listOfIssues.push(
-            Ticket(strUniqueID, _issueTitle, _issueDescription, NEW)
+            Ticket(strUniqueID, _issueTitle, _issueDescription, NEW,0)
         );
 
         getIssueTitleFromID[issueIndex] = _issueTitle;
@@ -80,5 +79,24 @@ contract OnchainTicket is Ownable {
             listOfIntegrations.length - 1
         ];
         listOfIntegrations.pop();
+    }
+
+    function removeProblemReport(uint8 _problemReportIndex) external onlyOwner {
+        listOfIssues[_problemReportIndex] = listOfIssues[
+            listOfIssues.length - 1
+        ];
+        listOfIssues.pop();
+    }
+
+    function updatePRStatus (uint8 _problemReportIndex, uint8 _newStatus) external onlyOwner {
+        Ticket storage updatedPR = listOfIssues[_problemReportIndex];   //create a new struct of Ticket type and assign selected listOfissues array
+        updatedPR.status = _newStatus;  //Update selected PR status
+
+    }
+
+    function upVotePR (uint8 _problemReportIndex) external {
+        Ticket storage updatedVoteCounter = listOfIssues[_problemReportIndex];
+        updatedVoteCounter.voteCount ++;
+
     }
 }
