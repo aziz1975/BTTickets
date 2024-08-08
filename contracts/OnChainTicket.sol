@@ -99,4 +99,16 @@ contract OnchainTicket is Ownable {
         updatedVoteCounter.voteCount ++;
 
     }
+
+    function updateIRStatus (uint8 _integrationIndex, uint8 _newStatus) external onlyOwner {
+        Ticket storage updatedIR = listOfIntegrations[_integrationIndex];   //create a new struct of Ticket type and assign selected listOfissues array
+        updatedIR.status = _newStatus;  //Update selected PR status
+
+    }
+
+    function upVoteIR (uint8 _integrationIndex) external {
+        Ticket storage updatedVoteCounter = listOfIntegrations[_integrationIndex];
+        updatedVoteCounter.voteCount ++;
+
+    }
 }

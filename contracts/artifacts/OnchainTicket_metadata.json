@@ -330,11 +330,42 @@
 				"inputs": [
 					{
 						"internalType": "uint8",
+						"name": "_integrationIndex",
+						"type": "uint8"
+					}
+				],
+				"name": "upVoteIR",
+				"outputs": [],
+				"stateMutability": "nonpayable",
+				"type": "function"
+			},
+			{
+				"inputs": [
+					{
+						"internalType": "uint8",
 						"name": "_problemReportIndex",
 						"type": "uint8"
 					}
 				],
 				"name": "upVotePR",
+				"outputs": [],
+				"stateMutability": "nonpayable",
+				"type": "function"
+			},
+			{
+				"inputs": [
+					{
+						"internalType": "uint8",
+						"name": "_integrationIndex",
+						"type": "uint8"
+					},
+					{
+						"internalType": "uint8",
+						"name": "_newStatus",
+						"type": "uint8"
+					}
+				],
+				"name": "updateIRStatus",
 				"outputs": [],
 				"stateMutability": "nonpayable",
 				"type": "function"
@@ -448,11 +479,11 @@
 			]
 		},
 		"contracts/OnChainTicket.sol": {
-			"keccak256": "0xb6809aa5c6a98dcf438042be54924b0c660f57d16fe5cb80e3f4f040eec25bf0",
+			"keccak256": "0xf34a764b6e9135f7986882eeef8aacd1dae798f178775e80983c1c1d22e05510",
 			"license": "UNLICENSED",
 			"urls": [
-				"bzz-raw://0ba61fc7c826e29acd5f1a6310140b6223e19d221698f105f15124e18943e65e",
-				"dweb:/ipfs/QmVyRXguiBrinNVq51MJ45WfVqXnVhGdktCR9BB7qkUpda"
+				"bzz-raw://e2876ea8f9e9fd57364ba2d3775f53c698af8a7135ac211686ac7bb678a4edd6",
+				"dweb:/ipfs/QmUHyqbSo6BUq999XHngPmoD7uLybMDY2G8arGVPQaShpS"
 			]
 		}
 	},
