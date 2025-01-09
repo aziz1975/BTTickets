@@ -24,10 +24,10 @@ To-Dos:
 */
 pragma solidity ^0.8.19;
 
-import "@openzeppelin/contracts/access/Ownable.sol";
+//import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/Strings.sol";
 
-contract OnchainTicket is Ownable {
+contract OnchainTicket {
     uint128 public integrationIndex; //Integration projects index to serve as unique ID counter for Projects integrations
     uint128 public issueIndex; //Issue index to serve as unique ID counter for issues
     uint8 internal constant NEW = 0;
@@ -36,7 +36,7 @@ contract OnchainTicket is Ownable {
     uint8 internal constant DONE = 3;
     uint8 internal constant REJ = 4;
     uint8 internal constant HIDE = 5;
-
+    address public owner;
     struct Ticket {
         //Struct for Integration proposals and their unique IDs
 
@@ -65,7 +65,13 @@ contract OnchainTicket is Ownable {
     mapping(uint128 => uint16) public getIssueVotesFromID;
     mapping(uint128 => string) public getIssueRaisedByAddressFromID;
 
-    constructor() Ownable(msg.sender) {
+    modifier onlyOwner() {
+        require(msg.sender == owner, "Only owner may call function");
+        _;
+    }
+
+    constructor() {
+        owner = msg.sender;
         integrationIndex = 0; //Initialize integration index so we can start unique IDs from 1
         issueIndex = 0; //Initialize Problem Report index we can start unique IDs from 1
     }
