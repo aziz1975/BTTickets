@@ -1,66 +1,22 @@
-## Foundry
+## BT Tickets
 
-**Foundry is a blazing fast, portable and modular toolkit for Ethereum application development written in Rust.**
-
-Foundry consists of:
-
--   **Forge**: Ethereum testing framework (like Truffle, Hardhat and DappTools).
--   **Cast**: Swiss army knife for interacting with EVM smart contracts, sending transactions and getting chain data.
--   **Anvil**: Local Ethereum node, akin to Ganache, Hardhat Network.
--   **Chisel**: Fast, utilitarian, and verbose solidity REPL.
+**Goal: BT Tickets is an on-chain ticketing system, the contract is able to record PRs and Feature Requests but can be re-purposed for any ticketing solution, fully on-chain, no backend needed.
 
 ## Documentation
 
-https://book.getfoundry.sh/
+TBD
 
-## Usage
+## Contract
 
-### Build
+### Compile & Deployment
 
 ```shell
-$ forge build
+$ forge compile
+$ forge create --legacy OnChainTicket --rpc-url https://rpc.bt.io/ --interactive
 ```
 
-### Test
+## UI
 
-```shell
-$ forge test
-```
+Basic proof of concept UI can be found in the /frontend directory
 
-### Format
-
-```shell
-$ forge fmt
-```
-
-### Gas Snapshots
-
-```shell
-$ forge snapshot
-```
-
-### Anvil
-
-```shell
-$ anvil
-```
-
-### Deploy
-
-```shell
-$ forge script script/Counter.s.sol:CounterScript --rpc-url <your_rpc_url> --private-key <your_private_key>
-```
-
-### Cast
-
-```shell
-$ cast <subcommand>
-```
-
-### Help
-
-```shell
-$ forge --help
-$ anvil --help
-$ cast --help
 ```
