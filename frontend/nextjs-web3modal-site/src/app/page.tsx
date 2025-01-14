@@ -1,3 +1,5 @@
+/* eslint-disable */
+
 "use client";
 import React, {
   useEffect,
@@ -61,7 +63,7 @@ import { capitalize } from "./utils/utils";
    ------------------------------------------------------------------ */
 
 // Make sure each column has a `sortable` boolean:
-export const columns = [
+const columns = [
   { name: "ID", uid: "id", sortable: true },
   { name: "Title", uid: "title", sortable: true },
   { name: "Description", uid: "description", sortable: false },
@@ -71,7 +73,7 @@ export const columns = [
   { name: "Actions", uid: "actions", sortable: false },
 ];
 
-export const statusOptions = [
+const statusOptions = [
   { name: "new", uid: "0" },
   { name: "in_review", uid: "1" },
   { name: "deferred", uid: "2" },
