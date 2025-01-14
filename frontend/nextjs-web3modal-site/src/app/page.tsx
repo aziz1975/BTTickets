@@ -4,7 +4,6 @@ import React, {
   useState,
   useCallback,
   ReactNode,
-  Key as ReactKey,
   ChangeEvent,
 } from "react";
 import Web3Modal from "web3modal";
@@ -45,6 +44,9 @@ import {
   Chip,
   Pagination,
 } from "@nextui-org/react";
+
+// IMPORTANT: import `Key` from @react-types/shared
+import type { Key } from "@react-types/shared";
 
 import { abi } from "./constants/abi";
 import { EcosystemLogo } from "./EcosystemLogo";
@@ -167,9 +169,8 @@ export default function TronBitTorrentIssues(): JSX.Element {
   );
 
   // NextUI selection: can be "all" or Set<Key>.
-  // If the library complains about the TS type of `Key`,
-  // we can alias it to ReactKey, e.g. `type Key = React.Key;`
-  const [selectedKeys, setSelectedKeys] = useState<"all" | Set<ReactKey>>(new Set());
+  // Here, `Key` is from `@react-types/shared`.
+  const [selectedKeys, setSelectedKeys] = useState<"all" | Set<Key>>(new Set<Key>());
 
   // NextUI's sorting descriptor (column + direction)
   const [sortDescriptor, setSortDescriptor] = useState<SortDescriptor>({
@@ -308,15 +309,17 @@ export default function TronBitTorrentIssues(): JSX.Element {
         ]
       */
 
-      const mapped = fetchedUsers.map((obj: any) => {
+      // Convert each object to string for `id`.
+      const mapped: IntegrationRequest[] = fetchedUsers.map((obj: any) => {
         return {
+          // Convert to string so we don't get a bigint for `id`
           id: obj[0].toString(),
           title: obj[1],
           description: obj[2],
           status: obj[3].toString(),
-          votes: obj[4],
+          votes: obj[4],     // can stay as bigint for display
           raisedby: obj[5],
-        } as IntegrationRequest;
+        };
       });
 
       console.log("Calling getIntegrationsList from the contract...");
@@ -610,8 +613,10 @@ export default function TronBitTorrentIssues(): JSX.Element {
   ]);
 
   const bottomContent = React.useMemo(() => {
+    // If "all" is selected, the count is the total items on the page
+    // otherwise the size of the Set
     const currentItemsCount =
-      selectedKeys === "all" ? items.length : (selectedKeys as Set<ReactKey>).size;
+      selectedKeys === "all" ? items.length : selectedKeys.size;
 
     return (
       <div className="py-2 px-2 flex justify-between items-center">
@@ -850,9 +855,9 @@ export default function TronBitTorrentIssues(): JSX.Element {
         }}
         classNames={classNames}
         selectionMode="multiple"
-        // Fix #1: ensure we're passing "all" or an iterable
-        selectedKeys={selectedKeys === "all" ? "all" : selectedKeys}
-        onSelectionChange={(keys) => setSelectedKeys(keys)}
+        // Ensure the prop is either "all" or a Set<Key> (which is iterable)
+        selectedKeys={selectedKeys}
+        onSelectionChange={setSelectedKeys}
         sortDescriptor={sortDescriptor}
         onSortChange={(descriptor) => setSortDescriptor(descriptor)}
         topContent={topContent}
@@ -863,7 +868,6 @@ export default function TronBitTorrentIssues(): JSX.Element {
             <TableColumn
               key={column.uid}
               align={column.uid === "actions" ? "center" : "start"}
-              // Fix #2: now each column has a `sortable` property
               allowsSorting={column.sortable}
               className="dark"
             >
@@ -873,6 +877,8 @@ export default function TronBitTorrentIssues(): JSX.Element {
         </TableHeader>
         <TableBody emptyContent="No Integrations found" items={sortedItems}>
           {(item) => (
+            // Key must be string | number.
+            // item.id is string since we used obj[0].toString() above.
             <TableRow key={item.id}>
               {(columnKey) => (
                 <TableCell>{renderCell(item, columnKey as ColumnKey)}</TableCell>
