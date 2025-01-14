@@ -27,6 +27,7 @@ import {
   ModalBody,
   ModalFooter,
   useDisclosure,
+  SortDescriptor, // <--- import from @nextui-org/react
 } from "@nextui-org/react";
 import {
   Table,
@@ -51,6 +52,8 @@ import { PlusIcon } from "./assets/Plusicon";
 import { VerticalDotsIcon } from "./assets/VerticalDotsIcon";
 import { SearchIcon } from "./assets/Searchicon";
 import { ChevronDownIcon } from "./assets/ChevronDownIcon";
+
+// Update your columns so each has a 'sortable' boolean:
 import { columns, statusOptions } from "./data";
 import { capitalize } from "./utils/utils";
 
@@ -58,27 +61,19 @@ import { capitalize } from "./utils/utils";
    Type definitions
    ------------------------------------------------------------------ */
 
-// Define what each row from the contract looks like *after* mapping:
 interface IntegrationRequest {
-  id: string;           // e.g., obj[0].toString()
-  title: string;        // e.g., obj[1]
-  description: string;  // e.g., obj[2]
-  status: string;       // e.g., obj[3].toString() => "0", "1", ...
-  votes: bigint;        // e.g., obj[4] as bigint (or string/number as needed)
-  raisedby: string;     // e.g., obj[5]
-}
-
-// For sorting
-type SortDirection = "ascending" | "descending";
-interface SortDescriptor {
-  column: keyof IntegrationRequest;
-  direction: SortDirection;
+  id: string;          // e.g., obj[0].toString()
+  title: string;       // e.g., obj[1]
+  description: string; // e.g., obj[2]
+  status: string;      // e.g., obj[3].toString()
+  votes: bigint;       // e.g., obj[4]
+  raisedby: string;    // e.g., obj[5]
 }
 
 // The possible columns we can render (including "actions")
 type ColumnKey = keyof IntegrationRequest | "actions";
 
-// For mapping status codes to NextUI Chip colors
+// Map status codes to NextUI Chip colors
 type StatusColorKey = "0" | "1" | "2" | "3" | "4" | "5";
 type StatusColorValue = "primary" | "warning" | "default" | "success" | "danger";
 type StatusColorMap = Record<StatusColorKey, StatusColorValue>;
@@ -113,7 +108,7 @@ const providerOptions = {
   walletconnect: {
     package: WalletConnectProvider,
     options: {
-      rpc: { 1029: "https://pre-rpc.bt.io/" }, // Assigning BTTC testnet chain ID and RPC
+      rpc: { 1029: "https://pre-rpc.bt.io/" }, // BTTC testnet chain ID and RPC
     },
   },
 };
@@ -139,7 +134,6 @@ export default function TronBitTorrentIssues(): JSX.Element {
 
   // For filtering
   const [filterValue, setFilterValue] = useState<string>("");
-  // We'll allow multiple statuses, or the special "all"
   const [statusFilter, setStatusFilter] = useState<"all" | Set<string>>("all");
 
   // For pagination
@@ -150,9 +144,12 @@ export default function TronBitTorrentIssues(): JSX.Element {
   const [visibleColumns, setVisibleColumns] = useState<Set<ColumnKey>>(
     new Set(INITIAL_VISIBLE_COLUMNS),
   );
-  const [selectedKeys, setSelectedKeys] = useState<Set<Key>>(new Set());
 
-  // For sorting
+  // NextUI selection: can be "all" or Set<Key>.
+  // (If you only want single selection, your type & usage can differ.)
+  const [selectedKeys, setSelectedKeys] = useState<"all" | Set<Key>>(new Set());
+
+  // NextUI's sorting descriptor (column + direction)
   const [sortDescriptor, setSortDescriptor] = useState<SortDescriptor>({
     column: "status",
     direction: "ascending",
@@ -281,10 +278,9 @@ export default function TronBitTorrentIssues(): JSX.Element {
 
     try {
       const contract = new ethers.Contract(CONTRACT_ADDRESS, abi, signer);
-      let fetchedUsers = await contract.getIntegrationsList();
-
+      const fetchedUsers = await contract.getIntegrationsList();
       /*
-        The shape of `fetchedUsers` from the contract might be something like:
+        The shape of `fetchedUsers` from the contract might be like:
         [
           [bigint, string, string, bigint, bigint, string],
           [bigint, string, string, bigint, bigint, string],
@@ -352,12 +348,22 @@ export default function TronBitTorrentIssues(): JSX.Element {
     return filteredItems.slice(start, end);
   }, [page, filteredItems, rowsPerPage]);
 
+  // Apply a simple custom sort
   const sortedItems = React.useMemo(() => {
+    if (!sortDescriptor.column) return items;
+
+    // The table's 'column' is a string or null; cast it to one of our keys
+    const colKey = sortDescriptor.column as keyof IntegrationRequest;
     return [...items].sort((a, b) => {
-      const first = a[sortDescriptor.column];
-      const second = b[sortDescriptor.column];
-      if (first < second) return sortDescriptor.direction === "descending" ? 1 : -1;
-      if (first > second) return sortDescriptor.direction === "descending" ? -1 : 1;
+      const first = a[colKey];
+      const second = b[colKey];
+
+      if (first < second) {
+        return sortDescriptor.direction === "descending" ? 1 : -1;
+      }
+      if (first > second) {
+        return sortDescriptor.direction === "descending" ? -1 : 1;
+      }
       return 0;
     });
   }, [sortDescriptor, items]);
@@ -584,6 +590,9 @@ export default function TronBitTorrentIssues(): JSX.Element {
   ]);
 
   const bottomContent = React.useMemo(() => {
+    const currentItemsCount = 
+      selectedKeys === "all" ? items.length : (selectedKeys as Set<Key>).size;
+
     return (
       <div className="py-2 px-2 flex justify-between items-center">
         <Pagination
@@ -599,13 +608,13 @@ export default function TronBitTorrentIssues(): JSX.Element {
           onChange={setPage}
         />
         <span className="text-small text-default-400">
-          {selectedKeys.size === items.length
+          {currentItemsCount === items.length
             ? "All items selected"
-            : `${selectedKeys.size} of ${items.length} selected`}
+            : `${currentItemsCount} of ${items.length} selected`}
         </span>
       </div>
     );
-  }, [selectedKeys, items.length, page, pages, hasSearchFilter]);
+  }, [selectedKeys, items, page, pages, hasSearchFilter]);
 
   /* ------------------------------------------------------------------
      Table classNames
@@ -820,14 +829,14 @@ export default function TronBitTorrentIssues(): JSX.Element {
           },
         }}
         classNames={classNames}
-        className="dark flex min-h-screen items-center justify-between p-2"
+        // You can choose single or multiple selection; if single, adapt your state accordingly
+        selectionMode="multiple"
         selectedKeys={selectedKeys}
-        selectionMode="single"
+        onSelectionChange={setSelectedKeys}
         sortDescriptor={sortDescriptor}
+        onSortChange={(descriptor) => setSortDescriptor(descriptor)}
         topContent={topContent}
         topContentPlacement="inside"
-        onSelectionChange={setSelectedKeys}
-        onSortChange={setSortDescriptor}
       >
         <TableHeader columns={headerColumns}>
           {(column) => (
