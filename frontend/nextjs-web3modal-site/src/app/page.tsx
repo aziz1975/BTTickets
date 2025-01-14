@@ -4,7 +4,7 @@ import React, {
   useState,
   useCallback,
   ReactNode,
-  Key,
+  Key as ReactKey,
   ChangeEvent,
 } from "react";
 import Web3Modal from "web3modal";
@@ -27,7 +27,7 @@ import {
   ModalBody,
   ModalFooter,
   useDisclosure,
-  SortDescriptor, // <--- import from @nextui-org/react
+  SortDescriptor,
 } from "@nextui-org/react";
 import {
   Table,
@@ -52,10 +52,31 @@ import { PlusIcon } from "./assets/Plusicon";
 import { VerticalDotsIcon } from "./assets/VerticalDotsIcon";
 import { SearchIcon } from "./assets/Searchicon";
 import { ChevronDownIcon } from "./assets/ChevronDownIcon";
-
-// Update your columns so each has a 'sortable' boolean:
-import { columns, statusOptions } from "./data";
 import { capitalize } from "./utils/utils";
+
+/* ------------------------------------------------------------------
+   Columns & data
+   ------------------------------------------------------------------ */
+
+// Make sure each column has a `sortable` boolean:
+export const columns = [
+  { name: "ID", uid: "id", sortable: true },
+  { name: "Title", uid: "title", sortable: true },
+  { name: "Description", uid: "description", sortable: false },
+  { name: "Status", uid: "status", sortable: true },
+  { name: "Votes", uid: "votes", sortable: true },
+  { name: "Raised By", uid: "raisedby", sortable: false },
+  { name: "Actions", uid: "actions", sortable: false },
+];
+
+export const statusOptions = [
+  { name: "new", uid: "0" },
+  { name: "in_review", uid: "1" },
+  { name: "deferred", uid: "2" },
+  { name: "done", uid: "3" },
+  { name: "rej", uid: "4" },
+  { name: "hide", uid: "5" },
+];
 
 /* ------------------------------------------------------------------
    Type definitions
@@ -146,8 +167,9 @@ export default function TronBitTorrentIssues(): JSX.Element {
   );
 
   // NextUI selection: can be "all" or Set<Key>.
-  // (If you only want single selection, your type & usage can differ.)
-  const [selectedKeys, setSelectedKeys] = useState<"all" | Set<Key>>(new Set());
+  // If the library complains about the TS type of `Key`,
+  // we can alias it to ReactKey, e.g. `type Key = React.Key;`
+  const [selectedKeys, setSelectedKeys] = useState<"all" | Set<ReactKey>>(new Set());
 
   // NextUI's sorting descriptor (column + direction)
   const [sortDescriptor, setSortDescriptor] = useState<SortDescriptor>({
@@ -159,9 +181,7 @@ export default function TronBitTorrentIssues(): JSX.Element {
   const [issueTitleValue, setIssueTitleValue] = useState<string>("");
   const [issueDescriptionValue, setIssueDescriptionValue] = useState<string>("");
   const [projectNameValue, setProjectNameValue] = useState<string>("");
-  const [projectDescriptionValue, setProjectDescriptionValue] = useState<string>(
-    "",
-  );
+  const [projectDescriptionValue, setProjectDescriptionValue] = useState<string>("");
 
   // Used to display Navbar items in mobile menu
   const menuItems = ["Integrations", "Problem Reports", "Ecosystem Map"];
@@ -590,8 +610,8 @@ export default function TronBitTorrentIssues(): JSX.Element {
   ]);
 
   const bottomContent = React.useMemo(() => {
-    const currentItemsCount = 
-      selectedKeys === "all" ? items.length : (selectedKeys as Set<Key>).size;
+    const currentItemsCount =
+      selectedKeys === "all" ? items.length : (selectedKeys as Set<ReactKey>).size;
 
     return (
       <div className="py-2 px-2 flex justify-between items-center">
@@ -829,10 +849,10 @@ export default function TronBitTorrentIssues(): JSX.Element {
           },
         }}
         classNames={classNames}
-        // You can choose single or multiple selection; if single, adapt your state accordingly
         selectionMode="multiple"
-        selectedKeys={selectedKeys}
-        onSelectionChange={setSelectedKeys}
+        // Fix #1: ensure we're passing "all" or an iterable
+        selectedKeys={selectedKeys === "all" ? "all" : selectedKeys}
+        onSelectionChange={(keys) => setSelectedKeys(keys)}
         sortDescriptor={sortDescriptor}
         onSortChange={(descriptor) => setSortDescriptor(descriptor)}
         topContent={topContent}
@@ -843,6 +863,7 @@ export default function TronBitTorrentIssues(): JSX.Element {
             <TableColumn
               key={column.uid}
               align={column.uid === "actions" ? "center" : "start"}
+              // Fix #2: now each column has a `sortable` property
               allowsSorting={column.sortable}
               className="dark"
             >
