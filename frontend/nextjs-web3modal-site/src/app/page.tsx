@@ -404,14 +404,14 @@ export default function TronBitTorrentIssues(): JSX.Element {
       switch (columnKey) {
         case "id":
           return (
-            <div className="flex flex-col">
+            <div className="flex flex-col text-white">
               <p className="text-bold text-small capitalize">{user.id}</p>
             </div>
           );
 
         case "votes":
           return (
-            <div className="flex flex-col">
+            <div className="flex flex-col text-white">
               <p className="text-bold text-small capitalize">
                 {user.votes.toString()}
               </p>
@@ -420,7 +420,7 @@ export default function TronBitTorrentIssues(): JSX.Element {
 
         case "title":
           return (
-            <div className="flex flex-col">
+            <div className="flex flex-col text-white">
               <p className="text-bold text-sm capitalize text-default-400">
                 {user.title}
               </p>
@@ -441,7 +441,7 @@ export default function TronBitTorrentIssues(): JSX.Element {
 
         case "actions":
           return (
-            <div className="relative flex justify-end items-center gap-2">
+            <div className="relative flex justify-end items-center gap-2 text-white">
               <Dropdown className="dark bg-background border-1 border-default-200">
                 <DropdownTrigger>
                   <Button isIconOnly radius="full" size="sm" variant="light">
@@ -461,7 +461,8 @@ export default function TronBitTorrentIssues(): JSX.Element {
           );
 
         default:
-          return cellValue;
+          // For description, raisedby, etc.
+          return <span className="text-white">{cellValue}</span>;
       }
     },
     [],
@@ -649,9 +650,12 @@ export default function TronBitTorrentIssues(): JSX.Element {
 
   const classNames = React.useMemo(() => {
     return {
-      wrapper: ["max-h-[382px]", "max-w-3xl"],
+      // Removed "max-w-3xl" to allow wider table
+      // so columns are visible without horizontal scrolling
+      wrapper: ["max-h-[382px]", "w-[90vw]"], 
       th: ["bg-transparent", "text-default-500", "border-b", "border-divider"],
       td: [
+        "text-white",  // ensure row font color is white
         // row border radius, etc.
         // first
         "group-data-[first=true]:first:before:rounded-none",
@@ -699,13 +703,14 @@ export default function TronBitTorrentIssues(): JSX.Element {
               Integrations
             </Link>
           </NavbarItem>
+          {/* Changed the color of "Issues" and "Eco map" links */}
           <NavbarItem isActive>
-            <Link color="foreground" href="#2">
+            <Link style={{ color: "#FFA500" }} href="#2">
               Issues
             </Link>
           </NavbarItem>
           <NavbarItem>
-            <Link color="foreground" href="#3">
+            <Link style={{ color: "#FFA500" }} href="#3">
               Eco Map
             </Link>
           </NavbarItem>
@@ -719,7 +724,11 @@ export default function TronBitTorrentIssues(): JSX.Element {
                   Connected
                 </Button>
               ) : (
-                <Button color="warning" variant="ghost" onClick={connect}>
+                // Changed the "Connect Wallet" button to dark blue
+                <Button
+                  style={{ backgroundColor: "#00008B", color: "#ffffff" }}
+                  onClick={connect}
+                >
                   Connect Wallet
                 </Button>
               )
@@ -844,51 +853,54 @@ export default function TronBitTorrentIssues(): JSX.Element {
       </Modal>
 
       {/* Table of Integrations */}
-      <Table
-        isCompact
-        layout="auto"
-        aria-label="Integration Requests List"
-        bottomContent={bottomContent}
-        bottomContentPlacement="outside"
-        checkboxesProps={{
-          classNames: {
-            wrapper: "after:bg-foreground after:text-background text-background",
-          },
-        }}
-        classNames={classNames}
-        selectionMode="multiple"
-        // Ensure the prop is either "all" or a Set<Key> (which is iterable)
-        selectedKeys={selectedKeys}
-        onSelectionChange={setSelectedKeys}
-        sortDescriptor={sortDescriptor}
-        onSortChange={(descriptor) => setSortDescriptor(descriptor)}
-        topContent={topContent}
-        topContentPlacement="inside"
-      >
-        <TableHeader columns={headerColumns}>
-          {(column) => (
-            <TableColumn
-              key={column.uid}
-              align={column.uid === "actions" ? "center" : "start"}
-              allowsSorting={column.sortable}
-              className="dark"
-            >
-              {column.name}
-            </TableColumn>
-          )}
-        </TableHeader>
-        <TableBody emptyContent="No Integrations found" items={sortedItems}>
-          {(item) => (
-            // Key must be string | number.
-            // item.id is string since we used obj[0].toString() above.
-            <TableRow key={item.id}>
-              {(columnKey) => (
-                <TableCell>{renderCell(item, columnKey as ColumnKey)}</TableCell>
-              )}
-            </TableRow>
-          )}
-        </TableBody>
-      </Table>
+      {/* Wrapped the table in a flex container so it is centered horizontally */}
+      <div className="flex justify-center w-full mt-5">
+        <Table
+          isCompact
+          layout="auto"
+          aria-label="Integration Requests List"
+          bottomContent={bottomContent}
+          bottomContentPlacement="outside"
+          checkboxesProps={{
+            classNames: {
+              wrapper: "after:bg-foreground after:text-background text-background",
+            },
+          }}
+          classNames={classNames}
+          selectionMode="multiple"
+          // Ensure the prop is either "all" or a Set<Key> (which is iterable)
+          selectedKeys={selectedKeys}
+          onSelectionChange={setSelectedKeys}
+          sortDescriptor={sortDescriptor}
+          onSortChange={(descriptor) => setSortDescriptor(descriptor)}
+          topContent={topContent}
+          topContentPlacement="inside"
+        >
+          <TableHeader columns={headerColumns}>
+            {(column) => (
+              <TableColumn
+                key={column.uid}
+                align={column.uid === "actions" ? "center" : "start"}
+                allowsSorting={column.sortable}
+                className="dark"
+              >
+                {column.name}
+              </TableColumn>
+            )}
+          </TableHeader>
+          <TableBody emptyContent="No Integrations found" items={sortedItems}>
+            {(item) => (
+              // Key must be string | number.
+              // item.id is string since we used obj[0].toString() above.
+              <TableRow key={item.id}>
+                {(columnKey) => (
+                  <TableCell>{renderCell(item, columnKey as ColumnKey)}</TableCell>
+                )}
+              </TableRow>
+            )}
+          </TableBody>
+        </Table>
+      </div>
     </main>
   );
 }
