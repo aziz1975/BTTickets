@@ -1,22 +1,33 @@
 "use client";
+import React, {
+  useEffect,
+  useState,
+  useCallback,
+  ReactNode,
+  Key,
+  ChangeEvent,
+} from "react";
 import Web3Modal from "web3modal";
 import WalletConnectProvider from "@walletconnect/web3-provider";
 import { ethers } from "ethers";
-//import { Button, ButtonGroup } from "@nextui-org/button";
-import { Navbar, NavbarBrand, NavbarContent, NavbarItem, NavbarMenuToggle, NavbarMenu, NavbarMenuItem } from "@nextui-org/navbar";
+import {
+  Navbar,
+  NavbarBrand,
+  NavbarContent,
+  NavbarItem,
+  NavbarMenuToggle,
+  NavbarMenu,
+  NavbarMenuItem,
+} from "@nextui-org/navbar";
 import { Link } from "@nextui-org/link";
-import { Image } from "@nextui-org/image";
-import React from "react";
-import { useEffect, useState, useCallback } from "react";
-//import { Table, TableHeader, TableColumn, TableBody, TableRow, TableCell, User, Chip, Tooltip, getKeyValue } from "@nextui-org/react";
-import { Modal, ModalContent, ModalHeader, ModalBody, ModalFooter, useDisclosure, Checkbox, Tooltip } from "@nextui-org/react";
-import { EditIcon } from "./EditIcon";
-import { DeleteIcon } from "./DeleteIcon";
-import { EyeIcon } from "./EyeIcon";
-import { EcosystemLogo } from "./EcosystemLogo";
-//import { columns, users } from "./data";
-import { abi } from "./constants/abi";
-import { Divider } from "@nextui-org/divider";
+import {
+  Modal,
+  ModalContent,
+  ModalHeader,
+  ModalBody,
+  ModalFooter,
+  useDisclosure,
+} from "@nextui-org/react";
 import {
   Table,
   TableHeader,
@@ -31,107 +42,313 @@ import {
   DropdownMenu,
   DropdownItem,
   Chip,
-  User,
   Pagination,
 } from "@nextui-org/react";
 
-import { PlusIcon } from "./assets/PlusIcon";
+import { abi } from "./constants/abi";
+import { EcosystemLogo } from "./EcosystemLogo";
+import { PlusIcon } from "./assets/Plusicon";
 import { VerticalDotsIcon } from "./assets/VerticalDotsIcon";
-import { SearchIcon } from "./assets/SearchIcon";
+import { SearchIcon } from "./assets/Searchicon";
 import { ChevronDownIcon } from "./assets/ChevronDownIcon";
 import { columns, statusOptions } from "./data";
 import { capitalize } from "./utils/utils";
 
-let web3Modal: any;
+/* ------------------------------------------------------------------
+   Type definitions
+   ------------------------------------------------------------------ */
 
-const statusColorMap: any = {
-  "0": "primary", //NEW
-  "1": "warning", //IN_REVIEW
-  "2": "default", //DEFERRED
-  "3": "success", //DONE
-  "4": "danger",  //REJ
-  "5": "default",  //HIDE
-};
-
-var users: Array<Record<string, any>> = [];
-
-
-
-const INITIAL_VISIBLE_COLUMNS = ["id", "title", "description", "status", "votes", "raisedby", "actions"];
-
-const providerOptions = {
-
-  walletconnect: {
-
-    package: WalletConnectProvider,
-    options: {
-      rpc: { 199: "https://rpc.bt.io/" }, //Assigning BTTC Mainnet chain ID and public RPC
-
-    }
-  },
+// Define what each row from the contract looks like *after* mapping:
+interface IntegrationRequest {
+  id: string;           // e.g., obj[0].toString()
+  title: string;        // e.g., obj[1]
+  description: string;  // e.g., obj[2]
+  status: string;       // e.g., obj[3].toString() => "0", "1", ...
+  votes: bigint;        // e.g., obj[4] as bigint (or string/number as needed)
+  raisedby: string;     // e.g., obj[5]
 }
 
+// For sorting
+type SortDirection = "ascending" | "descending";
+interface SortDescriptor {
+  column: keyof IntegrationRequest;
+  direction: SortDirection;
+}
 
+// The possible columns we can render (including "actions")
+type ColumnKey = keyof IntegrationRequest | "actions";
 
-export default function Home() {
+// For mapping status codes to NextUI Chip colors
+type StatusColorKey = "0" | "1" | "2" | "3" | "4" | "5";
+type StatusColorValue = "primary" | "warning" | "default" | "success" | "danger";
+type StatusColorMap = Record<StatusColorKey, StatusColorValue>;
 
+const statusColorMap: StatusColorMap = {
+  "0": "primary", // NEW
+  "1": "warning", // IN_REVIEW
+  "2": "default", // DEFERRED
+  "3": "success", // DONE
+  "4": "danger",  // REJ
+  "5": "default", // HIDE
+};
 
-  const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const [isConnected, setIsConnected] = useState(false);
-  const [hasMetamask, setHasMetamask] = useState(false);
-  const [signer, setSigner] = useState<ethers.JsonRpcSigner | undefined>(undefined);
-  const { isOpen: isPRModalOpen, onOpen: onPRModalOpen, onOpenChange: onPRModalChange } = useDisclosure();
-  const { isOpen: isIntegrationModalOpen, onOpen: onIntegrationModalOpen, onOpenChange: onIntegrationModalChange } = useDisclosure();
-  const [filterValue, setFilterValue] = useState("");
-  const [selectedKeys, setSelectedKeys] = useState(new Set([]));
-  const [visibleColumns, setVisibleColumns] = useState(new Set(INITIAL_VISIBLE_COLUMNS));
-  const [statusFilter, setStatusFilter] = useState("all");
-  const [rowsPerPage, setRowsPerPage] = useState(10);
-  const [sortDescriptor, setSortDescriptor] = useState({
+/* ------------------------------------------------------------------
+   Constants
+   ------------------------------------------------------------------ */
+
+const INITIAL_VISIBLE_COLUMNS: ColumnKey[] = [
+  "id",
+  "title",
+  "description",
+  "status",
+  "votes",
+  "raisedby",
+  "actions",
+];
+
+// NOTE: Adjust this to your actual contract address
+const CONTRACT_ADDRESS = "0xf4b6085ae33f073ee7D20ab4F6b79158C8F7889E";
+
+const providerOptions = {
+  walletconnect: {
+    package: WalletConnectProvider,
+    options: {
+      rpc: { 1029: "https://pre-rpc.bt.io/" }, // Assigning BTTC testnet chain ID and RPC
+    },
+  },
+};
+
+export default function TronBitTorrentIssues(): JSX.Element {
+  const [isConnected, setIsConnected] = useState<boolean>(false);
+  const [hasMetamask, setHasMetamask] = useState<boolean>(false);
+  const [signer, setSigner] = useState<ethers.JsonRpcSigner | null>(null);
+
+  const {
+    isOpen: isPRModalOpen,
+    onOpen: onPRModalOpen,
+    onOpenChange: onPRModalChange,
+  } = useDisclosure();
+
+  const {
+    isOpen: isIntegrationModalOpen,
+    onOpen: onIntegrationModalOpen,
+    onOpenChange: onIntegrationModalChange,
+  } = useDisclosure();
+
+  const [users, setUsers] = useState<IntegrationRequest[]>([]);
+
+  // For filtering
+  const [filterValue, setFilterValue] = useState<string>("");
+  // We'll allow multiple statuses, or the special "all"
+  const [statusFilter, setStatusFilter] = useState<"all" | Set<string>>("all");
+
+  // For pagination
+  const [rowsPerPage, setRowsPerPage] = useState<number>(10);
+  const [page, setPage] = useState<number>(1);
+
+  // For columns
+  const [visibleColumns, setVisibleColumns] = useState<Set<ColumnKey>>(
+    new Set(INITIAL_VISIBLE_COLUMNS),
+  );
+  const [selectedKeys, setSelectedKeys] = useState<Set<Key>>(new Set());
+
+  // For sorting
+  const [sortDescriptor, setSortDescriptor] = useState<SortDescriptor>({
     column: "status",
     direction: "ascending",
   });
-  const [page, setPage] = useState(1);
-  const [issueTitleValue, setissueTitleValue] = useState("");
-  const [issueDescriptionValue, setissueDescriptionValue] = useState("");
-  const [projectDescriptionValue, setprojectDescriptionValue] = useState("");
-  const [projectNameValue, setprojectNameValue] = useState("");
-  const [hookusers, sethookusers] = useState([]);
 
+  // For modal inputs
+  const [issueTitleValue, setIssueTitleValue] = useState<string>("");
+  const [issueDescriptionValue, setIssueDescriptionValue] = useState<string>("");
+  const [projectNameValue, setProjectNameValue] = useState<string>("");
+  const [projectDescriptionValue, setProjectDescriptionValue] = useState<string>(
+    "",
+  );
 
+  // Used to display Navbar items in mobile menu
+  const menuItems = ["Integrations", "Problem Reports", "Ecosystem Map"];
 
+  /* ------------------------------------------------------------------
+     Lifecycle
+     ------------------------------------------------------------------ */
+
+  useEffect(() => {
+    if (typeof window.ethereum !== "undefined") {
+      setHasMetamask(true);
+    }
+  }, []);
+
+  useEffect(() => {
+    console.log(`Wallet connection status changed to ${isConnected}`);
+    if (isConnected) {
+      void getIntegrationStatus();
+    }
+  }, [isConnected]);
+
+  /* ------------------------------------------------------------------
+     Web3 / Contract calls
+     ------------------------------------------------------------------ */
+
+  async function connect(): Promise<void> {
+    if (typeof window.ethereum === "undefined") {
+      setIsConnected(false);
+      return;
+    }
+
+    const web3Modal = new Web3Modal({
+      cacheProvider: false,
+      providerOptions,
+    });
+
+    try {
+      await web3Modal.connect();
+      const provider = new ethers.BrowserProvider(window.ethereum);
+      const _signer = await provider.getSigner();
+      setSigner(_signer);
+      setIsConnected(true);
+    } catch (e) {
+      console.log(e);
+      setIsConnected(false);
+    }
+  }
+
+  async function addNewIntegration(
+    _IRTitle: string,
+    _IRDescription: string,
+  ): Promise<void> {
+    if (!isConnected || !signer) {
+      console.log("Please connect your wallet before adding an integration.");
+      return;
+    }
+
+    if (!_IRTitle || !_IRDescription) {
+      console.log("Either Title or Description is empty.");
+      return;
+    }
+
+    const contract = new ethers.Contract(CONTRACT_ADDRESS, abi, signer);
+    try {
+      // Send transaction
+      await contract.addNewIntegration(_IRTitle, _IRDescription);
+
+      // Clear fields
+      setProjectNameValue("");
+      setProjectDescriptionValue("");
+
+      // Optionally refresh the list
+      void getIntegrationStatus();
+    } catch (error) {
+      console.log(error);
+    }
+  }
+
+  async function addNewProblemReport(
+    _PRTitle: string,
+    _PRDescription: string,
+  ): Promise<void> {
+    if (!isConnected || !signer) {
+      console.log("Please connect your wallet before adding a problem report.");
+      return;
+    }
+
+    if (!_PRTitle || !_PRDescription) {
+      console.log("Either Title or Description is empty.");
+      return;
+    }
+
+    const contract = new ethers.Contract(CONTRACT_ADDRESS, abi, signer);
+    try {
+      // Send transaction
+      await contract.addNewIssue(_PRTitle, _PRDescription);
+
+      // Clear fields
+      setIssueTitleValue("");
+      setIssueDescriptionValue("");
+
+      // Optionally refresh the list
+      void getIntegrationStatus();
+    } catch (error) {
+      console.log(error);
+    }
+  }
+
+  async function getIntegrationStatus(): Promise<void> {
+    if (!isConnected || !signer) {
+      console.log("Please connect your wallet");
+      return;
+    }
+
+    try {
+      const contract = new ethers.Contract(CONTRACT_ADDRESS, abi, signer);
+      let fetchedUsers = await contract.getIntegrationsList();
+
+      /*
+        The shape of `fetchedUsers` from the contract might be something like:
+        [
+          [bigint, string, string, bigint, bigint, string],
+          [bigint, string, string, bigint, bigint, string],
+          ...
+        ]
+      */
+
+      const mapped = fetchedUsers.map((obj: any) => {
+        return {
+          id: obj[0].toString(),
+          title: obj[1],
+          description: obj[2],
+          status: obj[3].toString(),
+          votes: obj[4],
+          raisedby: obj[5],
+        } as IntegrationRequest;
+      });
+
+      console.log("Calling getIntegrationsList from the contract...");
+      console.log(mapped);
+
+      setUsers(mapped);
+    } catch (error) {
+      console.log(error);
+    }
+  }
+
+  /* ------------------------------------------------------------------
+     Table filtering, pagination, sorting
+     ------------------------------------------------------------------ */
 
   const hasSearchFilter = Boolean(filterValue);
 
   const headerColumns = React.useMemo(() => {
     if (visibleColumns.size === columns.length) return columns;
-
-    return columns.filter((column) => Array.from(visibleColumns).includes(column.uid));
+    return columns.filter((column) => visibleColumns.has(column.uid as ColumnKey));
   }, [visibleColumns]);
 
   const filteredItems = React.useMemo(() => {
-    let filteredUsers = [...users];
+    let filtered = [...users];
 
+    // Text search
     if (hasSearchFilter) {
-      filteredUsers = filteredUsers.filter((user) =>
-        user.title.toLowerCase().includes(filterValue.toLowerCase()),
-      );
-    }
-    if (statusFilter !== "all" && Array.from(statusFilter).length !== statusOptions.length) {
-      filteredUsers = filteredUsers.filter((user) =>
-        Array.from(statusFilter).includes(user.status),
+      filtered = filtered.filter((u) =>
+        u.title.toLowerCase().includes(filterValue.toLowerCase()),
       );
     }
 
-    return filteredUsers;
-  }, [users, filterValue, statusFilter]);
+    // Status filter
+    if (
+      statusFilter !== "all" &&
+      Array.from(statusFilter).length !== statusOptions.length
+    ) {
+      filtered = filtered.filter((u) => statusFilter.has(u.status));
+    }
+
+    return filtered;
+  }, [users, filterValue, statusFilter, hasSearchFilter]);
 
   const pages = Math.ceil(filteredItems.length / rowsPerPage);
 
   const items = React.useMemo(() => {
     const start = (page - 1) * rowsPerPage;
     const end = start + rowsPerPage;
-
     return filteredItems.slice(start, end);
   }, [page, filteredItems, rowsPerPage]);
 
@@ -139,221 +356,96 @@ export default function Home() {
     return [...items].sort((a, b) => {
       const first = a[sortDescriptor.column];
       const second = b[sortDescriptor.column];
-      const cmp = first < second ? -1 : first > second ? 1 : 0;
-
-      return sortDescriptor.direction === "descending" ? -cmp : cmp;
+      if (first < second) return sortDescriptor.direction === "descending" ? 1 : -1;
+      if (first > second) return sortDescriptor.direction === "descending" ? -1 : 1;
+      return 0;
     });
   }, [sortDescriptor, items]);
 
+  /* ------------------------------------------------------------------
+     Table renderCell
+     ------------------------------------------------------------------ */
 
+  const renderCell = useCallback(
+    (user: IntegrationRequest, columnKey: ColumnKey): ReactNode => {
+      const cellValue = user[columnKey as keyof IntegrationRequest];
 
+      switch (columnKey) {
+        case "id":
+          return (
+            <div className="flex flex-col">
+              <p className="text-bold text-small capitalize">{user.id}</p>
+            </div>
+          );
 
-  const menuItems = [
-    "Integrations",
-    "Problem Reports",
-    "Ecosystem Map"
+        case "votes":
+          return (
+            <div className="flex flex-col">
+              <p className="text-bold text-small capitalize">
+                {user.votes.toString()}
+              </p>
+            </div>
+          );
 
-  ];
+        case "title":
+          return (
+            <div className="flex flex-col">
+              <p className="text-bold text-sm capitalize text-default-400">
+                {user.title}
+              </p>
+            </div>
+          );
 
-  useEffect(() => {
-    if (typeof window.ethereum !== "undefined") {
-      setHasMetamask(true);
-    }
-  });
+        case "status":
+          return (
+            <Chip
+              className="capitalize border-none gap-1 text-default-600"
+              color={statusColorMap[user.status as StatusColorKey]}
+              size="sm"
+              variant="dot"
+            >
+              {user.status}
+            </Chip>
+          );
 
-  useEffect(() => {
-    console.log(`Wallet connection status changed to ${isConnected}`);
-    if (isConnected) {
-      getIntegrationStatus();
-    }
+        case "actions":
+          return (
+            <div className="relative flex justify-end items-center gap-2">
+              <Dropdown className="dark bg-background border-1 border-default-200">
+                <DropdownTrigger>
+                  <Button isIconOnly radius="full" size="sm" variant="light">
+                    <VerticalDotsIcon
+                      className="text-default-400"
+                      width={undefined}
+                      height={undefined}
+                    />
+                  </Button>
+                </DropdownTrigger>
+                <DropdownMenu>
+                  <DropdownItem>Up Vote</DropdownItem>
+                  <DropdownItem>Change Status</DropdownItem>
+                </DropdownMenu>
+              </Dropdown>
+            </div>
+          );
 
-
-    return () => {
-      // Optional cleanup
-    };
-  }, [isConnected]);  // Effect re-runs whenever `count` changes
-
-
-  async function connect() {
-    if (typeof window.ethereum !== "undefined") {
-      web3Modal = new Web3Modal({
-        cacheProvider: false,
-        providerOptions, // This is required
-
-      })
-      try {
-        const web3ModalProvider = await web3Modal.connect();
-
-
-        const provider = new ethers.BrowserProvider(window.ethereum);
-        setSigner(await provider.getSigner());  //WAIT UNTIL signer is obtained before setting flags, etc
-        setIsConnected(true); //Set connection flag to true after signer is obtained
-        //getIntegrationStatus(); //Get List of Integrations from contract
+        default:
+          return cellValue;
       }
-      catch (e) {
-        console.log(e);
-      }
+    },
+    [],
+  );
 
-    }
-    else {
-      setIsConnected(false);
-    }
-  }
+  /* ------------------------------------------------------------------
+     Handlers
+     ------------------------------------------------------------------ */
 
-  async function addNewIntegration(_IRTitle: string, _IRDescription: string) {
-    if (isConnected) {
-      const contractAddress = "0x28471b32E700c13e96cD807839899b1D51190064";  //New: 0x28471b32E700c13e96cD807839899b1D51190064
-      const contract = new ethers.Contract(contractAddress, abi, signer);
-      try {
-        if (_IRTitle != null || _IRDescription != null) { //No empty title OR description are allowed
-          setprojectNameValue("");
-          setprojectDescriptionValue("");
-          await contract.addNewIntegration(_IRTitle, _IRDescription);
-        }
-        else {
-          console.log("Either Title or Description are empty")
-        }
-
-      } catch (error) {
-        console.log(error);
-      }
-    } else {
-      console.log("addIntegration Please connect your wallet");
-    }
-
-  }
-
-  async function addNewProblemReport(_PRTitle: string, _PRDescription: string) {
-    if (isConnected) {
-      const contractAddress = "0x28471b32E700c13e96cD807839899b1D51190064";  //New: 0x28471b32E700c13e96cD807839899b1D51190064
-      const contract = new ethers.Contract(contractAddress, abi, signer);
-      try {
-        if (_PRTitle != null || _PRDescription != null) { //No empty title OR description are allowed
-          await contract.addNewIssue(_PRTitle, _PRDescription);
-        }
-        else {
-          console.log("Either Title or Description are empty")
-        }
-
-      } catch (error) {
-        console.log(error);
-      }
-    } else {
-      console.log("addNewIssue, Please connect your wallet");
-    }
-
-  }
-
-  async function getIntegrationStatus() {
-    //TODO: I don't understand why this funciton works properly when calling it from a Modal window but not from a hook or a normal button!!
-
-
-    if (isConnected) {
-      const contractAddress = "0x28471b32E700c13e96cD807839899b1D51190064";  //new: 0x28471b32E700c13e96cD807839899b1D51190064
-      const contract = new ethers.Contract(contractAddress, abi, signer);
-      try {
-        users = await contract.getIntegrationsList();
-        //console.log(users);
-        // Function to rename keys
-        users = users.map(obj => {
-          let newObj = { ...obj };
-
-          // Rename the keys
-          newObj["id"] = newObj["0"];
-          newObj["title"] = newObj["1"];
-          newObj["description"] = newObj["2"];
-          newObj["status"] = newObj["3"];
-          newObj["votes"] = newObj["4"];
-          newObj["raisedby"] = newObj["5"];
-
-          // Remove old keys
-          delete newObj["0"];
-          delete newObj["1"];
-          delete newObj["2"];
-          delete newObj["3"];
-          delete newObj["4"];
-          delete newObj["5"];
-
-          return newObj;
-        });
-        console.log("Calling getIntegrationsList function from Contract ;)...")
-        console.log(users);
-
-      }
-      catch (error) {
-        console.log(error);
-      }
-
-
-    }
-    else {
-      console.log("Please connect your wallet");
-    }
-
-  }
-
-  const renderCell = useCallback((user: any, columnKey: any) => {
-    const cellValue = user[columnKey];
-
-    switch (columnKey) {
-
-      case "id":
-        return (
-          <div className="flex flex-col">
-            <p className="text-bold text-small capitalize">{user.id}</p>
-          </div>
-        );
-      case "votes":
-        return (
-          <div className="flex flex-col">
-            <p className="text-bold text-small capitalize">{user.votes.toString()}</p>
-          </div>
-        );
-      case "title":
-        return (
-          <div className="flex flex-col">
-            <p className="text-bold text-sm capitalize text-default-400">{user.title}</p>
-          </div>
-        );
-      case "status":
-        return (
-          <Chip
-            className="capitalize border-none gap-1 text-default-600"
-            color={statusColorMap[user.status]}
-            size="sm"
-            variant="dot"
-          >
-            {cellValue}
-          </Chip>
-        );
-      case "actions":
-        return (
-          <div className="relative flex justify-end items-center gap-2">
-            <Dropdown className="dark bg-background border-1 border-default-200">
-              <DropdownTrigger>
-                <Button isIconOnly radius="full" size="sm" variant="light">
-                  <VerticalDotsIcon className="text-default-400" width={undefined} height={undefined} />
-                </Button>
-              </DropdownTrigger>
-              <DropdownMenu>
-                <DropdownItem>Up Vote</DropdownItem>
-                <DropdownItem>Change Status</DropdownItem>
-              </DropdownMenu>
-            </Dropdown>
-          </div>
-        );
-      default:
-        return cellValue;
-    }
-  }, []);
-
-  const onRowsPerPageChange = React.useCallback((e: any) => {
+  const onRowsPerPageChange = useCallback((e: ChangeEvent<HTMLSelectElement>) => {
     setRowsPerPage(Number(e.target.value));
     setPage(1);
   }, []);
 
-
-  const onSearchChange = React.useCallback((value: any) => {
+  const onSearchChange = useCallback((value: string) => {
     if (value) {
       setFilterValue(value);
       setPage(1);
@@ -362,8 +454,11 @@ export default function Home() {
     }
   }, []);
 
-  const topContent = React.useMemo(() => {
+  /* ------------------------------------------------------------------
+     Table topContent & bottomContent
+     ------------------------------------------------------------------ */
 
+  const topContent = React.useMemo(() => {
     return (
       <div className="flex flex-col gap-4">
         <div className="flex justify-between gap-3 items-end">
@@ -396,9 +491,11 @@ export default function Home() {
                 disallowEmptySelection
                 aria-label="Table Columns"
                 closeOnSelect={false}
-                selectedKeys={statusFilter}
+                selectedKeys={
+                  statusFilter === "all" ? new Set<string>() : statusFilter
+                }
                 selectionMode="multiple"
-                onSelectionChange={setStatusFilter}
+                onSelectionChange={(keys) => setStatusFilter(keys as Set<string>)}
                 className="dark"
               >
                 {statusOptions.map((status) => (
@@ -408,6 +505,7 @@ export default function Home() {
                 ))}
               </DropdownMenu>
             </Dropdown>
+
             <Dropdown className="dark">
               <DropdownTrigger className="hidden sm:flex">
                 <Button
@@ -424,7 +522,9 @@ export default function Home() {
                 closeOnSelect={false}
                 selectedKeys={visibleColumns}
                 selectionMode="multiple"
-                onSelectionChange={setVisibleColumns}
+                onSelectionChange={(keys) =>
+                  setVisibleColumns(keys as Set<ColumnKey>)
+                }
                 className="dark"
               >
                 {columns.map((column) => (
@@ -435,26 +535,29 @@ export default function Home() {
               </DropdownMenu>
             </Dropdown>
 
-            <div><Button
+            <Button
               className="bg-foreground text-background"
               endContent={<PlusIcon width={undefined} height={undefined} />}
               size="sm"
-              onPress={onIntegrationModalOpen}>
+              onPress={onIntegrationModalOpen}
+            >
               Request Integration
-            </Button></div>
-            <div><Button
+            </Button>
+
+            <Button
               className="bg-foreground text-background"
               endContent={<PlusIcon width={undefined} height={undefined} />}
               size="sm"
-              onPress={onPRModalOpen}>
+              onPress={onPRModalOpen}
+            >
               Create PR
-            </Button></div>
-
-
+            </Button>
           </div>
         </div>
         <div className="flex justify-between items-center">
-          <span className="text-default-400 text-small">Total {users.length} Integration Requests</span>
+          <span className="text-default-400 text-small">
+            Total {users.length} Integration Requests
+          </span>
           <label className="flex items-center text-default-400 text-small">
             Rows per page:
             <select
@@ -464,8 +567,6 @@ export default function Home() {
               <option value="10">10</option>
               <option value="15">15</option>
               <option value="20">20</option>
-
-
             </select>
           </label>
         </div>
@@ -478,8 +579,10 @@ export default function Home() {
     onSearchChange,
     onRowsPerPageChange,
     users.length,
-    hasSearchFilter,
+    onIntegrationModalOpen,
+    onPRModalOpen,
   ]);
+
   const bottomContent = React.useMemo(() => {
     return (
       <div className="py-2 px-2 flex justify-between items-center">
@@ -496,7 +599,7 @@ export default function Home() {
           onChange={setPage}
         />
         <span className="text-small text-default-400">
-          {selectedKeys.size === columns.length
+          {selectedKeys.size === items.length
             ? "All items selected"
             : `${selectedKeys.size} of ${items.length} selected`}
         </span>
@@ -504,13 +607,16 @@ export default function Home() {
     );
   }, [selectedKeys, items.length, page, pages, hasSearchFilter]);
 
+  /* ------------------------------------------------------------------
+     Table classNames
+     ------------------------------------------------------------------ */
 
-  const classNames = React.useMemo(
-    () => ({
+  const classNames = React.useMemo(() => {
+    return {
       wrapper: ["max-h-[382px]", "max-w-3xl"],
       th: ["bg-transparent", "text-default-500", "border-b", "border-divider"],
       td: [
-        // changing the rows border radius
+        // row border radius, etc.
         // first
         "group-data-[first=true]:first:before:rounded-none",
         "group-data-[first=true]:last:before:rounded-none",
@@ -520,16 +626,22 @@ export default function Home() {
         "group-data-[last=true]:first:before:rounded-none",
         "group-data-[last=true]:last:before:rounded-none",
       ],
-    }),
-    [],
-  );
+    };
+  }, []);
 
+  /* ------------------------------------------------------------------
+     Render
+     ------------------------------------------------------------------ */
 
   return (
-    <main color="primary" className="dark flex min-h-screen flex-col items-center justify-between p-3">
-      <Navbar isBordered disableAnimation classNames={{
-        base: "bg-default-500/15 shadow-lg",
-      }}>
+    <main className="dark flex min-h-screen flex-col items-center justify-between p-3">
+      <Navbar
+        isBordered
+        disableAnimation
+        classNames={{
+          base: "bg-default-500/15 shadow-lg",
+        }}
+      >
         <NavbarContent className="sm:hidden" justify="start">
           <NavbarMenuToggle />
         </NavbarContent>
@@ -552,7 +664,7 @@ export default function Home() {
             </Link>
           </NavbarItem>
           <NavbarItem isActive>
-            <Link color="foreground" href="#2" >
+            <Link color="foreground" href="#2">
               Issues
             </Link>
           </NavbarItem>
@@ -567,12 +679,18 @@ export default function Home() {
           <NavbarItem>
             {hasMetamask ? (
               isConnected ? (
-                <Button isDisabled color="success" variant="ghost" onClick={() => connect()}>Connected</Button>
+                <Button isDisabled color="success" variant="ghost">
+                  Connected
+                </Button>
               ) : (
-                <Button color="warning" variant="ghost" onClick={() => connect()}>Connect Wallet</Button>
+                <Button color="warning" variant="ghost" onClick={connect}>
+                  Connect Wallet
+                </Button>
               )
             ) : (
-              <Button isDisabled color="default" variant="ghost" onClick={() => connect()}>Wallet Not Detected</Button>
+              <Button isDisabled color="default" variant="ghost">
+                Wallet Not Detected
+              </Button>
             )}
           </NavbarItem>
         </NavbarContent>
@@ -580,12 +698,7 @@ export default function Home() {
         <NavbarMenu>
           {menuItems.map((item, index) => (
             <NavbarMenuItem key={`${item}-${index}`}>
-              <Link
-                className="w-full"
-                color="primary"
-                href="#"
-                size="lg"
-              >
+              <Link className="w-full" color="primary" href="#" size="lg">
                 {item}
               </Link>
             </NavbarMenuItem>
@@ -593,107 +706,113 @@ export default function Home() {
         </NavbarMenu>
       </Navbar>
 
+      {/* Integration Modal */}
+      <Modal
+        isOpen={isIntegrationModalOpen}
+        onOpenChange={onIntegrationModalChange}
+        placement="top-center"
+        className="dark"
+      >
+        <ModalContent>
+          {(onClose) => (
+            <>
+              <ModalHeader className="flex flex-col gap-1">
+                Project Integration Request
+              </ModalHeader>
+              <ModalBody>
+                <Input
+                  autoFocus
+                  label="Project name"
+                  placeholder="Enter project name"
+                  variant="bordered"
+                  value={projectNameValue}
+                  onValueChange={setProjectNameValue}
+                />
+                <Input
+                  label="Description"
+                  placeholder="Enter project description"
+                  type="description"
+                  variant="faded"
+                  size="md"
+                  value={projectDescriptionValue}
+                  onValueChange={setProjectDescriptionValue}
+                />
+              </ModalBody>
+              <ModalFooter>
+                <Button color="danger" variant="flat" onPress={onClose}>
+                  Close
+                </Button>
+                <Button
+                  color="primary"
+                  onClick={() => {
+                    void addNewIntegration(projectNameValue, projectDescriptionValue);
+                    onClose();
+                  }}
+                >
+                  Store in blockchain
+                </Button>
+              </ModalFooter>
+            </>
+          )}
+        </ModalContent>
+      </Modal>
 
-      <>
-        <Modal
-          isOpen={isIntegrationModalOpen}
-          onOpenChange={onIntegrationModalChange}
-          placement="top-center"
-          className="dark"
-        >
-          <ModalContent>
-            {(onClose) => (
-              <>
-                <ModalHeader className="flex flex-col gap-1">Project Integration Request</ModalHeader>
-                <ModalBody>
-                  <Input
-                    autoFocus
-                    label="Project name"
-                    placeholder="Enter project name"
-                    variant="bordered"
-                    value={projectNameValue}
-                    onValueChange={setprojectNameValue}
-                  />
-                  <Input
+      {/* Problem Report Modal */}
+      <Modal
+        isOpen={isPRModalOpen}
+        onOpenChange={onPRModalChange}
+        placement="top-center"
+        className="dark"
+      >
+        <ModalContent>
+          {(onClose) => (
+            <>
+              <ModalHeader className="flex flex-col gap-1">
+                New Problem Report
+              </ModalHeader>
+              <ModalBody>
+                <Input
+                  autoFocus
+                  label="Issue title"
+                  placeholder="Enter issue title"
+                  variant="bordered"
+                  value={issueTitleValue}
+                  onValueChange={setIssueTitleValue}
+                />
+                <Input
+                  label="Description"
+                  placeholder="Enter problem description"
+                  type="description"
+                  variant="faded"
+                  value={issueDescriptionValue}
+                  onValueChange={setIssueDescriptionValue}
+                />
+              </ModalBody>
+              <ModalFooter>
+                <Button color="danger" variant="flat" onPress={onClose}>
+                  Close
+                </Button>
+                <Button
+                  color="primary"
+                  onClick={() => {
+                    void addNewProblemReport(issueTitleValue, issueDescriptionValue);
+                    onClose();
+                  }}
+                >
+                  Store in blockchain
+                </Button>
+              </ModalFooter>
+            </>
+          )}
+        </ModalContent>
+      </Modal>
 
-                    label="Description"
-                    placeholder="Enter project description"
-                    type="description"
-                    variant="faded"
-                    size="md"
-                    value={projectDescriptionValue}
-                    onValueChange={setprojectDescriptionValue}
-                  />
-
-                </ModalBody>
-                <ModalFooter>
-                  <Button color="danger" variant="flat" onPress={onClose}>
-                    Close
-                  </Button>
-                  <Button color="primary" onClick={() => addNewIntegration(projectNameValue, projectDescriptionValue)} onPress={onClose}>
-                    Store in blockchain
-                  </Button>
-                </ModalFooter>
-              </>
-            )}
-          </ModalContent>
-        </Modal>
-      </>
-
-
-      <>
-        <Modal
-          isOpen={isPRModalOpen}
-          onOpenChange={onPRModalChange}
-          placement="top-center"
-          className="dark"
-        >
-          <ModalContent>
-            {(onClose) => (
-              <>
-                <ModalHeader className="flex flex-col gap-1">New Problem Report</ModalHeader>
-                <ModalBody>
-                  <Input
-                    autoFocus
-                    label="Issue title"
-                    placeholder="Enter issue title"
-                    variant="bordered"
-                    value={issueTitleValue}
-                    onValueChange={setissueTitleValue}
-                  />
-                  <Input
-
-                    label="Description"
-                    placeholder="Enter problem description"
-                    type="description"
-                    variant="faded"
-                    value={issueDescriptionValue}
-                    onValueChange={setissueDescriptionValue}
-                  />
-
-                </ModalBody>
-                <ModalFooter>
-                  <Button color="danger" variant="flat" onPress={onClose} >
-                    Close
-                  </Button>
-                  <Button color="primary" onPress={onClose} onClick={() => addNewProblemReport(issueTitleValue, issueDescriptionValue)}>
-                    Store in blockchain
-                  </Button>
-                </ModalFooter>
-              </>
-            )}
-          </ModalContent>
-        </Modal>
-      </>
-
-
-
+      {/* Table of Integrations */}
       <Table
         isCompact
         layout="auto"
-        aria-label="Integrations Request List"
+        aria-label="Integration Requests List"
         bottomContent={bottomContent}
-        className="dark"
         bottomContentPlacement="outside"
         checkboxesProps={{
           classNames: {
@@ -722,16 +841,16 @@ export default function Home() {
             </TableColumn>
           )}
         </TableHeader>
-        <TableBody emptyContent={"No Integrations found"} items={sortedItems}>
+        <TableBody emptyContent="No Integrations found" items={sortedItems}>
           {(item) => (
             <TableRow key={item.id}>
-              {(columnKey) => <TableCell>{renderCell(item, columnKey)}</TableCell>}
+              {(columnKey) => (
+                <TableCell>{renderCell(item, columnKey as ColumnKey)}</TableCell>
+              )}
             </TableRow>
           )}
         </TableBody>
       </Table>
-
-
     </main>
   );
 }
