@@ -1,14 +1,14 @@
 /* eslint-disable */
-
 "use client";
+
 import React, {
   useEffect,
   useState,
   useCallback,
   ReactNode,
   ChangeEvent,
+  useMemo,
 } from "react";
-import Web3Modal from "web3modal";
 import WalletConnectProvider from "@walletconnect/web3-provider";
 import { ethers } from "ethers";
 import {
@@ -129,6 +129,7 @@ const INITIAL_VISIBLE_COLUMNS: ColumnKey[] = [
 // NOTE: Adjust this to your actual contract address
 const CONTRACT_ADDRESS = "0xf4b6085ae33f073ee7D20ab4F6b79158C8F7889E";
 
+// This object is fine for specifying the RPC for WalletConnect
 const providerOptions = {
   walletconnect: {
     package: WalletConnectProvider,
@@ -137,6 +138,16 @@ const providerOptions = {
     },
   },
 };
+
+/**
+ * We cannot directly import web3modal with next/dynamic, because web3modal is
+ * not a React component. Instead, we'll conditionally require it in the client.
+ */
+let Web3Modal: any = null;
+if (typeof window !== "undefined") {
+  // Conditionally load in the browser only
+  Web3Modal = require("web3modal").default;
+}
 
 export default function TronBitTorrentIssues(): JSX.Element {
   const [isConnected, setIsConnected] = useState<boolean>(false);
@@ -171,8 +182,9 @@ export default function TronBitTorrentIssues(): JSX.Element {
   );
 
   // NextUI selection: can be "all" or Set<Key>.
-  // Here, `Key` is from `@react-types/shared`.
-  const [selectedKeys, setSelectedKeys] = useState<"all" | Set<Key>>(new Set<Key>());
+  const [selectedKeys, setSelectedKeys] = useState<"all" | Set<Key>>(
+    new Set<Key>(),
+  );
 
   // NextUI's sorting descriptor (column + direction)
   const [sortDescriptor, setSortDescriptor] = useState<SortDescriptor>({
@@ -184,7 +196,8 @@ export default function TronBitTorrentIssues(): JSX.Element {
   const [issueTitleValue, setIssueTitleValue] = useState<string>("");
   const [issueDescriptionValue, setIssueDescriptionValue] = useState<string>("");
   const [projectNameValue, setProjectNameValue] = useState<string>("");
-  const [projectDescriptionValue, setProjectDescriptionValue] = useState<string>("");
+  const [projectDescriptionValue, setProjectDescriptionValue] =
+    useState<string>("");
 
   // Used to display Navbar items in mobile menu
   const menuItems = ["Integrations", "Problem Reports", "Ecosystem Map"];
@@ -194,13 +207,14 @@ export default function TronBitTorrentIssues(): JSX.Element {
      ------------------------------------------------------------------ */
 
   useEffect(() => {
+    // Check for Metamask on client side
     if (typeof window.ethereum !== "undefined") {
       setHasMetamask(true);
     }
   }, []);
 
+  // Once connected changes, if connected, fetch data
   useEffect(() => {
-    console.log(`Wallet connection status changed to ${isConnected}`);
     if (isConnected) {
       void getIntegrationStatus();
     }
@@ -211,24 +225,23 @@ export default function TronBitTorrentIssues(): JSX.Element {
      ------------------------------------------------------------------ */
 
   async function connect(): Promise<void> {
-    if (typeof window.ethereum === "undefined") {
+    if (typeof window.ethereum === "undefined" || !Web3Modal) {
       setIsConnected(false);
       return;
     }
 
-    const web3Modal = new Web3Modal({
-      cacheProvider: false,
-      providerOptions,
-    });
-
     try {
+      const web3Modal = new Web3Modal({
+        cacheProvider: false,
+        providerOptions,
+      });
+
       await web3Modal.connect();
       const provider = new ethers.BrowserProvider(window.ethereum);
       const _signer = await provider.getSigner();
       setSigner(_signer);
       setIsConnected(true);
-    } catch (e) {
-      console.log(e);
+    } catch {
       setIsConnected(false);
     }
   }
@@ -238,28 +251,20 @@ export default function TronBitTorrentIssues(): JSX.Element {
     _IRDescription: string,
   ): Promise<void> {
     if (!isConnected || !signer) {
-      console.log("Please connect your wallet before adding an integration.");
       return;
     }
-
     if (!_IRTitle || !_IRDescription) {
-      console.log("Either Title or Description is empty.");
       return;
     }
 
     const contract = new ethers.Contract(CONTRACT_ADDRESS, abi, signer);
     try {
-      // Send transaction
       await contract.addNewIntegration(_IRTitle, _IRDescription);
-
-      // Clear fields
       setProjectNameValue("");
       setProjectDescriptionValue("");
-
-      // Optionally refresh the list
       void getIntegrationStatus();
     } catch (error) {
-      console.log(error);
+      console.error(error);
     }
   }
 
@@ -268,68 +273,46 @@ export default function TronBitTorrentIssues(): JSX.Element {
     _PRDescription: string,
   ): Promise<void> {
     if (!isConnected || !signer) {
-      console.log("Please connect your wallet before adding a problem report.");
       return;
     }
-
     if (!_PRTitle || !_PRDescription) {
-      console.log("Either Title or Description is empty.");
       return;
     }
 
     const contract = new ethers.Contract(CONTRACT_ADDRESS, abi, signer);
     try {
-      // Send transaction
       await contract.addNewIssue(_PRTitle, _PRDescription);
-
-      // Clear fields
       setIssueTitleValue("");
       setIssueDescriptionValue("");
-
-      // Optionally refresh the list
       void getIntegrationStatus();
     } catch (error) {
-      console.log(error);
+      console.error(error);
     }
   }
 
   async function getIntegrationStatus(): Promise<void> {
     if (!isConnected || !signer) {
-      console.log("Please connect your wallet");
       return;
     }
-
     try {
       const contract = new ethers.Contract(CONTRACT_ADDRESS, abi, signer);
       const fetchedUsers = await contract.getIntegrationsList();
-      /*
-        The shape of `fetchedUsers` from the contract might be like:
-        [
-          [bigint, string, string, bigint, bigint, string],
-          [bigint, string, string, bigint, bigint, string],
-          ...
-        ]
-      */
 
-      // Convert each object to string for `id`.
+      // Convert each object in the array
       const mapped: IntegrationRequest[] = fetchedUsers.map((obj: any) => {
         return {
-          // Convert to string so we don't get a bigint for `id`
           id: obj[0].toString(),
           title: obj[1],
           description: obj[2],
           status: obj[3].toString(),
-          votes: obj[4],     // can stay as bigint for display
+          votes: obj[4],
           raisedby: obj[5],
         };
       });
 
-      console.log("Calling getIntegrationsList from the contract...");
-      console.log(mapped);
-
       setUsers(mapped);
     } catch (error) {
-      console.log(error);
+      console.error(error);
     }
   }
 
@@ -339,22 +322,21 @@ export default function TronBitTorrentIssues(): JSX.Element {
 
   const hasSearchFilter = Boolean(filterValue);
 
-  const headerColumns = React.useMemo(() => {
+  const headerColumns = useMemo(() => {
     if (visibleColumns.size === columns.length) return columns;
     return columns.filter((column) => visibleColumns.has(column.uid as ColumnKey));
   }, [visibleColumns]);
 
-  const filteredItems = React.useMemo(() => {
+  // Computed items after filtering
+  const filteredItems = useMemo(() => {
     let filtered = [...users];
 
-    // Text search
     if (hasSearchFilter) {
       filtered = filtered.filter((u) =>
         u.title.toLowerCase().includes(filterValue.toLowerCase()),
       );
     }
 
-    // Status filter
     if (
       statusFilter !== "all" &&
       Array.from(statusFilter).length !== statusOptions.length
@@ -367,22 +349,20 @@ export default function TronBitTorrentIssues(): JSX.Element {
 
   const pages = Math.ceil(filteredItems.length / rowsPerPage);
 
-  const items = React.useMemo(() => {
+  // Final items for current page
+  const items = useMemo(() => {
     const start = (page - 1) * rowsPerPage;
     const end = start + rowsPerPage;
     return filteredItems.slice(start, end);
   }, [page, filteredItems, rowsPerPage]);
 
-  // Apply a simple custom sort
-  const sortedItems = React.useMemo(() => {
+  // Sorting
+  const sortedItems = useMemo(() => {
     if (!sortDescriptor.column) return items;
-
-    // The table's 'column' is a string or null; cast it to one of our keys
     const colKey = sortDescriptor.column as keyof IntegrationRequest;
     return [...items].sort((a, b) => {
       const first = a[colKey];
       const second = b[colKey];
-
       if (first < second) {
         return sortDescriptor.direction === "descending" ? 1 : -1;
       }
@@ -461,7 +441,6 @@ export default function TronBitTorrentIssues(): JSX.Element {
           );
 
         default:
-          // For description, raisedby, etc.
           return <span className="text-white">{cellValue}</span>;
       }
     },
@@ -478,19 +457,15 @@ export default function TronBitTorrentIssues(): JSX.Element {
   }, []);
 
   const onSearchChange = useCallback((value: string) => {
-    if (value) {
-      setFilterValue(value);
-      setPage(1);
-    } else {
-      setFilterValue("");
-    }
+    setFilterValue(value);
+    setPage(1);
   }, []);
 
   /* ------------------------------------------------------------------
      Table topContent & bottomContent
      ------------------------------------------------------------------ */
 
-  const topContent = React.useMemo(() => {
+  const topContent = useMemo(() => {
     return (
       <div className="flex flex-col gap-4">
         <div className="flex justify-between gap-3 items-end">
@@ -615,9 +590,7 @@ export default function TronBitTorrentIssues(): JSX.Element {
     onPRModalOpen,
   ]);
 
-  const bottomContent = React.useMemo(() => {
-    // If "all" is selected, the count is the total items on the page
-    // otherwise the size of the Set
+  const bottomContent = useMemo(() => {
     const currentItemsCount =
       selectedKeys === "all" ? items.length : selectedKeys.size;
 
@@ -629,7 +602,6 @@ export default function TronBitTorrentIssues(): JSX.Element {
             cursor: "bg-foreground text-background",
           }}
           color="default"
-          isDisabled={hasSearchFilter}
           page={page}
           total={pages}
           variant="light"
@@ -642,20 +614,20 @@ export default function TronBitTorrentIssues(): JSX.Element {
         </span>
       </div>
     );
-  }, [selectedKeys, items, page, pages, hasSearchFilter]);
+  }, [selectedKeys, items, page, pages]);
 
   /* ------------------------------------------------------------------
      Table classNames
      ------------------------------------------------------------------ */
 
-  const classNames = React.useMemo(() => {
+  const classNames = useMemo(() => {
     return {
       // Removed "max-w-3xl" to allow wider table
       // so columns are visible without horizontal scrolling
-      wrapper: ["max-h-[382px]", "w-[90vw]"], 
+      wrapper: ["max-h-[382px]", "w-[90vw]"],
       th: ["bg-transparent", "text-default-500", "border-b", "border-divider"],
       td: [
-        "text-white",  // ensure row font color is white
+        "text-white", 
         // row border radius, etc.
         // first
         "group-data-[first=true]:first:before:rounded-none",
@@ -724,7 +696,6 @@ export default function TronBitTorrentIssues(): JSX.Element {
                   Connected
                 </Button>
               ) : (
-                // Changed the "Connect Wallet" button to dark blue
                 <Button
                   style={{ backgroundColor: "#00008B", color: "#ffffff" }}
                   onClick={connect}
@@ -789,8 +760,11 @@ export default function TronBitTorrentIssues(): JSX.Element {
                 </Button>
                 <Button
                   color="primary"
-                  onClick={() => {
-                    void addNewIntegration(projectNameValue, projectDescriptionValue);
+                  onPress={() => {
+                    void addNewIntegration(
+                      projectNameValue,
+                      projectDescriptionValue,
+                    );
                     onClose();
                   }}
                 >
@@ -839,8 +813,11 @@ export default function TronBitTorrentIssues(): JSX.Element {
                 </Button>
                 <Button
                   color="primary"
-                  onClick={() => {
-                    void addNewProblemReport(issueTitleValue, issueDescriptionValue);
+                  onPress={() => {
+                    void addNewProblemReport(
+                      issueTitleValue,
+                      issueDescriptionValue,
+                    );
                     onClose();
                   }}
                 >
@@ -853,7 +830,6 @@ export default function TronBitTorrentIssues(): JSX.Element {
       </Modal>
 
       {/* Table of Integrations */}
-      {/* Wrapped the table in a flex container so it is centered horizontally */}
       <div className="flex justify-center w-full mt-5">
         <Table
           isCompact
@@ -868,7 +844,6 @@ export default function TronBitTorrentIssues(): JSX.Element {
           }}
           classNames={classNames}
           selectionMode="multiple"
-          // Ensure the prop is either "all" or a Set<Key> (which is iterable)
           selectedKeys={selectedKeys}
           onSelectionChange={setSelectedKeys}
           sortDescriptor={sortDescriptor}
