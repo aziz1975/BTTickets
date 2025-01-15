@@ -73,6 +73,17 @@ const columns = [
   { name: "Actions", uid: "actions", sortable: false },
 ];
 
+// We'll use the same structure for the PR table:
+const prColumns = [
+  { name: "ID", uid: "id", sortable: true },
+  { name: "Title", uid: "title", sortable: true },
+  { name: "Description", uid: "description", sortable: false },
+  { name: "Status", uid: "status", sortable: true },
+  { name: "Votes", uid: "votes", sortable: true },
+  { name: "Raised By", uid: "raisedby", sortable: false },
+  { name: "Actions", uid: "actions", sortable: false },
+];
+
 const statusOptions = [
   { name: "new", uid: "0" },
   { name: "in_review", uid: "1" },
@@ -166,18 +177,35 @@ export default function TronBitTorrentIssues(): JSX.Element {
     onOpenChange: onIntegrationModalChange,
   } = useDisclosure();
 
+  // For Integrations
   const [users, setUsers] = useState<IntegrationRequest[]>([]);
 
-  // For filtering
+  // For Problem Reports
+  const [prRequests, setPrRequests] = useState<IntegrationRequest[]>([]);
+
+  // For filtering (Integrations)
   const [filterValue, setFilterValue] = useState<string>("");
   const [statusFilter, setStatusFilter] = useState<"all" | Set<string>>("all");
 
-  // For pagination
+  // For filtering (Problem Reports)
+  const [prFilterValue, setPrFilterValue] = useState<string>("");
+  const [prStatusFilter, setPrStatusFilter] = useState<"all" | Set<string>>("all");
+
+  // For pagination (Integrations)
   const [rowsPerPage, setRowsPerPage] = useState<number>(10);
   const [page, setPage] = useState<number>(1);
 
-  // For columns
+  // For pagination (Problem Reports)
+  const [prRowsPerPage, setPrRowsPerPage] = useState<number>(10);
+  const [prPage, setPrPage] = useState<number>(1);
+
+  // For columns (Integrations)
   const [visibleColumns, setVisibleColumns] = useState<Set<ColumnKey>>(
+    new Set(INITIAL_VISIBLE_COLUMNS),
+  );
+
+  // For columns (Problem Reports)
+  const [prVisibleColumns, setPrVisibleColumns] = useState<Set<ColumnKey>>(
     new Set(INITIAL_VISIBLE_COLUMNS),
   );
 
@@ -185,9 +213,18 @@ export default function TronBitTorrentIssues(): JSX.Element {
   const [selectedKeys, setSelectedKeys] = useState<"all" | Set<Key>>(
     new Set<Key>(),
   );
+  const [prSelectedKeys, setPrSelectedKeys] = useState<"all" | Set<Key>>(
+    new Set<Key>(),
+  );
 
-  // NextUI's sorting descriptor (column + direction)
+  // NextUI's sorting descriptor (column + direction) for Integrations
   const [sortDescriptor, setSortDescriptor] = useState<SortDescriptor>({
+    column: "status",
+    direction: "ascending",
+  });
+
+  // NextUI's sorting descriptor (column + direction) for PR
+  const [prSortDescriptor, setPrSortDescriptor] = useState<SortDescriptor>({
     column: "status",
     direction: "ascending",
   });
@@ -217,6 +254,7 @@ export default function TronBitTorrentIssues(): JSX.Element {
   useEffect(() => {
     if (isConnected) {
       void getIntegrationStatus();
+      void getProblemReports();
     }
   }, [isConnected]);
 
@@ -284,7 +322,7 @@ export default function TronBitTorrentIssues(): JSX.Element {
       await contract.addNewIssue(_PRTitle, _PRDescription);
       setIssueTitleValue("");
       setIssueDescriptionValue("");
-      void getIntegrationStatus();
+      void getProblemReports();
     } catch (error) {
       console.error(error);
     }
@@ -316,8 +354,33 @@ export default function TronBitTorrentIssues(): JSX.Element {
     }
   }
 
+  async function getProblemReports(): Promise<void> {
+    if (!isConnected || !signer) {
+      return;
+    }
+    try {
+      const contract = new ethers.Contract(CONTRACT_ADDRESS, abi, signer);
+      const fetchedIssues = await contract.getPRList();
+
+      const mapped: IntegrationRequest[] = fetchedIssues.map((obj: any) => {
+        return {
+          id: obj[0].toString(),
+          title: obj[1],
+          description: obj[2],
+          status: obj[3].toString(),
+          votes: obj[4],
+          raisedby: obj[5],
+        };
+      });
+
+      setPrRequests(mapped);
+    } catch (error) {
+      console.error(error);
+    }
+  }
+
   /* ------------------------------------------------------------------
-     Table filtering, pagination, sorting
+     Table filtering, pagination, sorting (Integrations)
      ------------------------------------------------------------------ */
 
   const hasSearchFilter = Boolean(filterValue);
@@ -327,7 +390,7 @@ export default function TronBitTorrentIssues(): JSX.Element {
     return columns.filter((column) => visibleColumns.has(column.uid as ColumnKey));
   }, [visibleColumns]);
 
-  // Computed items after filtering
+  // Computed items after filtering (Integrations)
   const filteredItems = useMemo(() => {
     let filtered = [...users];
 
@@ -349,14 +412,14 @@ export default function TronBitTorrentIssues(): JSX.Element {
 
   const pages = Math.ceil(filteredItems.length / rowsPerPage);
 
-  // Final items for current page
+  // Final items for current page (Integrations)
   const items = useMemo(() => {
     const start = (page - 1) * rowsPerPage;
     const end = start + rowsPerPage;
     return filteredItems.slice(start, end);
   }, [page, filteredItems, rowsPerPage]);
 
-  // Sorting
+  // Sorting (Integrations)
   const sortedItems = useMemo(() => {
     if (!sortDescriptor.column) return items;
     const colKey = sortDescriptor.column as keyof IntegrationRequest;
@@ -374,7 +437,66 @@ export default function TronBitTorrentIssues(): JSX.Element {
   }, [sortDescriptor, items]);
 
   /* ------------------------------------------------------------------
-     Table renderCell
+     Table filtering, pagination, sorting (Problem Reports)
+     ------------------------------------------------------------------ */
+
+  const hasPRSearchFilter = Boolean(prFilterValue);
+
+  const prHeaderColumns = useMemo(() => {
+    if (prVisibleColumns.size === prColumns.length) return prColumns;
+    return prColumns.filter((column) =>
+      prVisibleColumns.has(column.uid as ColumnKey),
+    );
+  }, [prVisibleColumns]);
+
+  // Computed items after filtering (PR)
+  const prFilteredItems = useMemo(() => {
+    let filtered = [...prRequests];
+
+    if (hasPRSearchFilter) {
+      filtered = filtered.filter((u) =>
+        u.title.toLowerCase().includes(prFilterValue.toLowerCase()),
+      );
+    }
+
+    if (
+      prStatusFilter !== "all" &&
+      Array.from(prStatusFilter).length !== statusOptions.length
+    ) {
+      filtered = filtered.filter((u) => prStatusFilter.has(u.status));
+    }
+
+    return filtered;
+  }, [prRequests, prFilterValue, prStatusFilter, hasPRSearchFilter]);
+
+  const prPages = Math.ceil(prFilteredItems.length / prRowsPerPage);
+
+  // Final items for current page (PR)
+  const prItems = useMemo(() => {
+    const start = (prPage - 1) * prRowsPerPage;
+    const end = start + prRowsPerPage;
+    return prFilteredItems.slice(start, end);
+  }, [prPage, prFilteredItems, prRowsPerPage]);
+
+  // Sorting (PR)
+  const prSortedItems = useMemo(() => {
+    if (!prSortDescriptor.column) return prItems;
+    const colKey = prSortDescriptor.column as keyof IntegrationRequest;
+    return [...prItems].sort((a, b) => {
+      const first = a[colKey];
+      const second = b[colKey];
+      if (first < second) {
+        return prSortDescriptor.direction === "descending" ? 1 : -1;
+      }
+      if (first > second) {
+        return prSortDescriptor.direction === "descending" ? -1 : 1;
+      }
+      return 0;
+    });
+  }, [prSortDescriptor, prItems]);
+
+  /* ------------------------------------------------------------------
+     Table renderCell (Integrations)
      ------------------------------------------------------------------ */
 
   const renderCell = useCallback(
@@ -448,7 +570,81 @@ export default function TronBitTorrentIssues(): JSX.Element {
   );
 
   /* ------------------------------------------------------------------
-     Handlers
+     Table renderCell (Problem Reports)
+     ------------------------------------------------------------------ */
+
+  const renderPRCell = useCallback(
+    (pr: IntegrationRequest, columnKey: ColumnKey): ReactNode => {
+      const cellValue = pr[columnKey as keyof IntegrationRequest];
+
+      switch (columnKey) {
+        case "id":
+          return (
+            <div className="flex flex-col text-white">
+              <p className="text-bold text-small capitalize">{pr.id}</p>
+            </div>
+          );
+
+        case "votes":
+          return (
+            <div className="flex flex-col text-white">
+              <p className="text-bold text-small capitalize">
+                {pr.votes.toString()}
+              </p>
+            </div>
+          );
+
+        case "title":
+          return (
+            <div className="flex flex-col text-white">
+              <p className="text-bold text-sm capitalize text-default-400">
+                {pr.title}
+              </p>
+            </div>
+          );
+
+        case "status":
+          return (
+            <Chip
+              className="capitalize border-none gap-1 text-default-600"
+              color={statusColorMap[pr.status as StatusColorKey]}
+              size="sm"
+              variant="dot"
+            >
+              {pr.status}
+            </Chip>
+          );
+
+        case "actions":
+          return (
+            <div className="relative flex justify-end items-center gap-2 text-white">
+              <Dropdown className="dark bg-background border-1 border-default-200">
+                <DropdownTrigger>
+                  <Button isIconOnly radius="full" size="sm" variant="light">
+                    <VerticalDotsIcon
+                      className="text-default-400"
+                      width={undefined}
+                      height={undefined}
+                    />
+                  </Button>
+                </DropdownTrigger>
+                <DropdownMenu>
+                  <DropdownItem>Up Vote</DropdownItem>
+                  <DropdownItem>Change Status</DropdownItem>
+                </DropdownMenu>
+              </Dropdown>
+            </div>
+          );
+
+        default:
+          return <span className="text-white">{cellValue}</span>;
+      }
+    },
+    [],
+  );
+
+  /* ------------------------------------------------------------------
+     Handlers (Integrations)
      ------------------------------------------------------------------ */
 
   const onRowsPerPageChange = useCallback((e: ChangeEvent<HTMLSelectElement>) => {
@@ -462,7 +658,24 @@ export default function TronBitTorrentIssues(): JSX.Element {
   }, []);
 
   /* ------------------------------------------------------------------
-     Table topContent & bottomContent
+     Handlers (Problem Reports)
+     ------------------------------------------------------------------ */
+
+  const onPRRowsPerPageChange = useCallback(
+    (e: ChangeEvent<HTMLSelectElement>) => {
+      setPrRowsPerPage(Number(e.target.value));
+      setPrPage(1);
+    },
+    [],
+  );
+
+  const onPRSearchChange = useCallback((value: string) => {
+    setPrFilterValue(value);
+    setPrPage(1);
+  }, []);
+
+  /* ------------------------------------------------------------------
+     Table topContent & bottomContent (Integrations)
      ------------------------------------------------------------------ */
 
   const topContent = useMemo(() => {
@@ -471,9 +684,11 @@ export default function TronBitTorrentIssues(): JSX.Element {
         <div className="flex justify-between gap-3 items-end">
           <Input
             isClearable
+            style={{ color: "white" }} // search box text color
             classNames={{
               base: "w-full sm:max-w-[34%]",
               inputWrapper: "border-1",
+              input: "text-white", // ensure text is white
             }}
             placeholder="Search..."
             size="sm"
@@ -490,6 +705,8 @@ export default function TronBitTorrentIssues(): JSX.Element {
                   endContent={<ChevronDownIcon className="text-small" />}
                   size="sm"
                   variant="flat"
+                  // "Status" text color = white
+                  style={{ color: "white" }}
                 >
                   Status
                 </Button>
@@ -519,6 +736,8 @@ export default function TronBitTorrentIssues(): JSX.Element {
                   endContent={<ChevronDownIcon className="text-small" />}
                   size="sm"
                   variant="flat"
+                  // "Columns" text color = white
+                  style={{ color: "white" }}
                 >
                   Columns
                 </Button>
@@ -617,17 +836,157 @@ export default function TronBitTorrentIssues(): JSX.Element {
   }, [selectedKeys, items, page, pages]);
 
   /* ------------------------------------------------------------------
+     Table topContent & bottomContent (Problem Reports)
+     ------------------------------------------------------------------ */
+
+  const prTopContent = useMemo(() => {
+    return (
+      <div className="flex flex-col gap-4">
+        <div className="flex justify-between gap-3 items-end">
+          <Input
+            isClearable
+            style={{ color: "white" }} // search box text color
+            classNames={{
+              base: "w-full sm:max-w-[34%]",
+              inputWrapper: "border-1",
+              input: "text-white", // ensure text is white
+            }}
+            placeholder="Search..."
+            size="sm"
+            startContent={<SearchIcon className="text-default-300" />}
+            value={prFilterValue}
+            variant="bordered"
+            onClear={() => setPrFilterValue("")}
+            onValueChange={onPRSearchChange}
+          />
+          <div className="flex gap-3">
+            <Dropdown className="dark">
+              <DropdownTrigger className="hidden sm:flex">
+                <Button
+                  endContent={<ChevronDownIcon className="text-small" />}
+                  size="sm"
+                  variant="flat"
+                  style={{ color: "white" }} // "Status" text color = white
+                >
+                  Status
+                </Button>
+              </DropdownTrigger>
+              <DropdownMenu
+                disallowEmptySelection
+                aria-label="Table Columns"
+                closeOnSelect={false}
+                selectedKeys={
+                  prStatusFilter === "all" ? new Set<string>() : prStatusFilter
+                }
+                selectionMode="multiple"
+                onSelectionChange={(keys) =>
+                  setPrStatusFilter(keys as Set<string>)
+                }
+                className="dark"
+              >
+                {statusOptions.map((status) => (
+                  <DropdownItem key={status.uid} className="capitalize">
+                    {capitalize(status.name)}
+                  </DropdownItem>
+                ))}
+              </DropdownMenu>
+            </Dropdown>
+
+            <Dropdown className="dark">
+              <DropdownTrigger className="hidden sm:flex">
+                <Button
+                  endContent={<ChevronDownIcon className="text-small" />}
+                  size="sm"
+                  variant="flat"
+                  style={{ color: "white" }} // "Columns" text color = white
+                >
+                  Columns
+                </Button>
+              </DropdownTrigger>
+              <DropdownMenu
+                disallowEmptySelection
+                aria-label="Table Columns"
+                closeOnSelect={false}
+                selectedKeys={prVisibleColumns}
+                selectionMode="multiple"
+                onSelectionChange={(keys) =>
+                  setPrVisibleColumns(keys as Set<ColumnKey>)
+                }
+                className="dark"
+              >
+                {prColumns.map((column) => (
+                  <DropdownItem key={column.uid} className="capitalize">
+                    {capitalize(column.name)}
+                  </DropdownItem>
+                ))}
+              </DropdownMenu>
+            </Dropdown>
+          </div>
+        </div>
+        <div className="flex justify-between items-center">
+          <span className="text-default-400 text-small">
+            Total {prRequests.length} Problem Reports
+          </span>
+          <label className="flex items-center text-default-400 text-small">
+            Rows per page:
+            <select
+              className="bg-transparent outline-none text-default-400 text-small"
+              onChange={onPRRowsPerPageChange}
+            >
+              <option value="10">10</option>
+              <option value="15">15</option>
+              <option value="20">20</option>
+            </select>
+          </label>
+        </div>
+      </div>
+    );
+  }, [
+    prFilterValue,
+    prStatusFilter,
+    prVisibleColumns,
+    onPRSearchChange,
+    onPRRowsPerPageChange,
+    prRequests.length,
+  ]);
+
+  const prBottomContent = useMemo(() => {
+    const currentItemsCount =
+      prSelectedKeys === "all" ? prItems.length : prSelectedKeys.size;
+
+    return (
+      <div className="py-2 px-2 flex justify-between items-center">
+        <Pagination
+          showControls
+          classNames={{
+            cursor: "bg-foreground text-background",
+          }}
+          color="default"
+          page={prPage}
+          total={prPages}
+          variant="light"
+          onChange={setPrPage}
+        />
+        <span className="text-small text-default-400">
+          {currentItemsCount === prItems.length
+            ? "All items selected"
+            : `${currentItemsCount} of ${prItems.length} selected`}
+        </span>
+      </div>
+    );
+  }, [prSelectedKeys, prItems, prPage, prPages]);
+
+  /* ------------------------------------------------------------------
      Table classNames
      ------------------------------------------------------------------ */
 
   const classNames = useMemo(() => {
     return {
-      // Removed "max-w-3xl" to allow wider table
-      // so columns are visible without horizontal scrolling
+      // We removed "max-w-3xl" so columns are visible without horizontal scrolling
       wrapper: ["max-h-[382px]", "w-[90vw]"],
       th: ["bg-transparent", "text-default-500", "border-b", "border-divider"],
       td: [
-        "text-white", 
+        "text-white",
         // row border radius, etc.
         // first
         "group-data-[first=true]:first:before:rounded-none",
@@ -675,14 +1034,14 @@ export default function TronBitTorrentIssues(): JSX.Element {
               Integrations
             </Link>
           </NavbarItem>
-          {/* Changed the color of "Issues" and "Eco map" links */}
+          {/* "Issues" -> color blue */}
           <NavbarItem isActive>
-            <Link style={{ color: "#FFA500" }} href="#2">
+            <Link style={{ color: "blue" }} href="#2">
               Issues
             </Link>
           </NavbarItem>
           <NavbarItem>
-            <Link style={{ color: "#FFA500" }} href="#3">
+            <Link style={{ color: "blue" }} href="#3">
               Eco Map
             </Link>
           </NavbarItem>
@@ -692,12 +1051,14 @@ export default function TronBitTorrentIssues(): JSX.Element {
           <NavbarItem>
             {hasMetamask ? (
               isConnected ? (
-                <Button isDisabled color="success" variant="ghost">
+                <Button
+                  style={{ backgroundColor: "#00008B", color: "#ffffff" }}
+                >
                   Connected
                 </Button>
               ) : (
                 <Button
-                  style={{ backgroundColor: "#00008B", color: "#ffffff" }}
+                  style={{ backgroundColor: "#8B0000", color: "#ffffff" }}
                   onClick={connect}
                 >
                   Connect Wallet
@@ -829,7 +1190,9 @@ export default function TronBitTorrentIssues(): JSX.Element {
         </ModalContent>
       </Modal>
 
-      {/* Table of Integrations */}
+      {/* -------------------------------------------
+          Integrations Table (TOP)
+          -----------------------------------------*/}
       <div className="flex justify-center w-full mt-5">
         <Table
           isCompact
@@ -865,11 +1228,61 @@ export default function TronBitTorrentIssues(): JSX.Element {
           </TableHeader>
           <TableBody emptyContent="No Integrations found" items={sortedItems}>
             {(item) => (
-              // Key must be string | number.
-              // item.id is string since we used obj[0].toString() above.
               <TableRow key={item.id}>
                 {(columnKey) => (
-                  <TableCell>{renderCell(item, columnKey as ColumnKey)}</TableCell>
+                  <TableCell>
+                    {renderCell(item, columnKey as ColumnKey)}
+                  </TableCell>
+                )}
+              </TableRow>
+            )}
+          </TableBody>
+        </Table>
+      </div>
+
+      {/* -------------------------------------------
+          Problem Reports Table (BOTTOM)
+          -----------------------------------------*/}
+      <div className="flex justify-center w-full mt-12">
+        <Table
+          isCompact
+          layout="auto"
+          aria-label="Problem Reports List"
+          bottomContent={prBottomContent}
+          bottomContentPlacement="outside"
+          checkboxesProps={{
+            classNames: {
+              wrapper: "after:bg-foreground after:text-background text-background",
+            },
+          }}
+          classNames={classNames}
+          selectionMode="multiple"
+          selectedKeys={prSelectedKeys}
+          onSelectionChange={setPrSelectedKeys}
+          sortDescriptor={prSortDescriptor}
+          onSortChange={(descriptor) => setPrSortDescriptor(descriptor)}
+          topContent={prTopContent}
+          topContentPlacement="inside"
+        >
+          <TableHeader columns={prHeaderColumns}>
+            {(column) => (
+              <TableColumn
+                key={column.uid}
+                align={column.uid === "actions" ? "center" : "start"}
+                allowsSorting={column.sortable}
+                className="dark"
+              >
+                {column.name}
+              </TableColumn>
+            )}
+          </TableHeader>
+          <TableBody emptyContent="No Problem Reports found" items={prSortedItems}>
+            {(item) => (
+              <TableRow key={item.id}>
+                {(columnKey) => (
+                  <TableCell>
+                    {renderPRCell(item, columnKey as ColumnKey)}
+                  </TableCell>
                 )}
               </TableRow>
             )}
