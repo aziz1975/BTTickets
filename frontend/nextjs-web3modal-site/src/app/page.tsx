@@ -98,12 +98,12 @@ const statusOptions = [
    ------------------------------------------------------------------ */
 
 interface IntegrationRequest {
-  id: string;          // e.g., obj[0].toString()
-  title: string;       // e.g., obj[1]
-  description: string; // e.g., obj[2]
-  status: string;      // e.g., obj[3].toString()
-  votes: bigint;       // e.g., obj[4]
-  raisedby: string;    // e.g., obj[5]
+  id: string;          // e.g. "IR-0" or "PR-2"
+  title: string;       // e.g. obj[1]
+  description: string; // e.g. obj[2]
+  status: string;      // e.g. "0", "1", ...
+  votes: bigint;       // e.g. obj[4]
+  raisedby: string;    // e.g. obj[5]
 }
 
 // The possible columns we can render (including "actions")
@@ -364,7 +364,7 @@ export default function TronBitTorrentIssues(): JSX.Element {
       // Convert each object in the array
       const mapped: IntegrationRequest[] = fetchedUsers.map((obj: any) => {
         return {
-          id: obj[0].toString(),
+          id: obj[0].toString(),       // e.g. "IR-0"
           title: obj[1],
           description: obj[2],
           status: obj[3].toString(),
@@ -389,7 +389,7 @@ export default function TronBitTorrentIssues(): JSX.Element {
 
       const mapped: IntegrationRequest[] = fetchedIssues.map((obj: any) => {
         return {
-          id: obj[0].toString(),
+          id: obj[0].toString(),       // e.g. "PR-0"
           title: obj[1],
           description: obj[2],
           status: obj[3].toString(),
@@ -403,6 +403,88 @@ export default function TronBitTorrentIssues(): JSX.Element {
       console.error(error);
     }
   }
+
+  /**
+   * ------------------------------------------------------------------
+   * ADDITION 1: handleIntegrationAction
+   * Called whenever user picks "Up Vote" or "Change Status" from dropdown
+   * ------------------------------------------------------------------
+   */
+  const handleIntegrationAction = useCallback(
+    async (actionKey: Key, integrationId: string) => {
+      if (!signer) return;
+
+      // integrationId is something like "IR-0", "IR-1", etc.
+      // We need the numeric index from the end of the string:
+      const indexString = integrationId.replace("IR-", ""); // remove "IR-"
+      const index = parseInt(indexString, 10);
+
+      const contract = new ethers.Contract(CONTRACT_ADDRESS, abi, signer);
+
+      try {
+        setIsTransactionPending(true);
+
+        if (actionKey === "upvote") {
+          // Up Vote
+          const tx = await contract.upVoteIR(index);
+          await tx.wait();
+        } else if ((actionKey as string).startsWith("status-")) {
+          // "status-0", "status-1", etc.
+          const newStatus = parseInt((actionKey as string).split("-")[1], 10);
+          const tx = await contract.updateIRStatus(index, newStatus);
+          await tx.wait();
+        }
+
+        setIsTransactionPending(false);
+        await getIntegrationStatus();
+      } catch (error) {
+        setIsTransactionPending(false);
+        console.error(error);
+      }
+    },
+    [signer, getIntegrationStatus],
+  );
+
+  /**
+   * ------------------------------------------------------------------
+   * ADDITION 2: handlePRAction
+   * Called whenever user picks "Up Vote" or "Change Status" from dropdown
+   * ------------------------------------------------------------------
+   */
+  const handlePRAction = useCallback(
+    async (actionKey: Key, prId: string) => {
+      if (!signer) return;
+
+      // prId is something like "PR-0", "PR-1", etc.
+      // We need the numeric index from the end of the string:
+      const indexString = prId.replace("PR-", ""); // remove "PR-"
+      const index = parseInt(indexString, 10);
+
+      const contract = new ethers.Contract(CONTRACT_ADDRESS, abi, signer);
+
+      try {
+        setIsTransactionPending(true);
+
+        if (actionKey === "upvote") {
+          // Up Vote
+          const tx = await contract.upVotePR(index);
+          await tx.wait();
+        } else if ((actionKey as string).startsWith("status-")) {
+          // "status-0", "status-1", etc.
+          const newStatus = parseInt((actionKey as string).split("-")[1], 10);
+          const tx = await contract.updatePRStatus(index, newStatus);
+          await tx.wait();
+        }
+
+        setIsTransactionPending(false);
+        await getProblemReports();
+      } catch (error) {
+        setIsTransactionPending(false);
+        console.error(error);
+      }
+    },
+    [signer, getProblemReports],
+  );
 
   /* ------------------------------------------------------------------
      Table filtering, pagination, sorting (Integrations)
@@ -579,10 +661,33 @@ export default function TronBitTorrentIssues(): JSX.Element {
                     />
                   </Button>
                 </DropdownTrigger>
-                <DropdownMenu>
-                  <DropdownItem style={{ color: "white" }}>Up Vote</DropdownItem>
-                  <DropdownItem style={{ color: "white" }}>
-                    Change Status
+
+                {/* Updated: use onAction to handle "Up Vote" & "Change Status" */}
+                <DropdownMenu
+                  aria-label="Integration actions"
+                  onAction={(key) => handleIntegrationAction(key, user.id)}
+                >
+                  <DropdownItem key="upvote" style={{ color: "white" }}>
+                    Up Vote
+                  </DropdownItem>
+                  {/* 6 statuses: new (0), in_review (1), deferred (2), done (3), rej (4), hide (5) */}
+                  <DropdownItem key="status-0" style={{ color: "white" }}>
+                    Change to NEW
+                  </DropdownItem>
+                  <DropdownItem key="status-1" style={{ color: "white" }}>
+                    Change to IN_REVIEW
+                  </DropdownItem>
+                  <DropdownItem key="status-2" style={{ color: "white" }}>
+                    Change to DEFERRED
+                  </DropdownItem>
+                  <DropdownItem key="status-3" style={{ color: "white" }}>
+                    Change to DONE
+                  </DropdownItem>
+                  <DropdownItem key="status-4" style={{ color: "white" }}>
+                    Change to REJ
+                  </DropdownItem>
+                  <DropdownItem key="status-5" style={{ color: "white" }}>
+                    Change to HIDE
                   </DropdownItem>
                 </DropdownMenu>
               </Dropdown>
@@ -593,7 +698,7 @@ export default function TronBitTorrentIssues(): JSX.Element {
           return <span className="text-white">{cellValue}</span>;
       }
     },
-    [],
+    [handleIntegrationAction],
   );
 
   /* ------------------------------------------------------------------
@@ -655,10 +760,32 @@ export default function TronBitTorrentIssues(): JSX.Element {
                     />
                   </Button>
                 </DropdownTrigger>
-                <DropdownMenu>
-                  <DropdownItem style={{ color: "white" }}>Up Vote</DropdownItem>
-                  <DropdownItem style={{ color: "white" }}>
-                    Change Status
+
+                {/* Updated: use onAction to handle "Up Vote" & "Change Status" */}
+                <DropdownMenu
+                  aria-label="PR actions"
+                  onAction={(key) => handlePRAction(key, pr.id)}
+                >
+                  <DropdownItem key="upvote" style={{ color: "white" }}>
+                    Up Vote
+                  </DropdownItem>
+                  <DropdownItem key="status-0" style={{ color: "white" }}>
+                    Change to NEW
+                  </DropdownItem>
+                  <DropdownItem key="status-1" style={{ color: "white" }}>
+                    Change to IN_REVIEW
+                  </DropdownItem>
+                  <DropdownItem key="status-2" style={{ color: "white" }}>
+                    Change to DEFERRED
+                  </DropdownItem>
+                  <DropdownItem key="status-3" style={{ color: "white" }}>
+                    Change to DONE
+                  </DropdownItem>
+                  <DropdownItem key="status-4" style={{ color: "white" }}>
+                    Change to REJ
+                  </DropdownItem>
+                  <DropdownItem key="status-5" style={{ color: "white" }}>
+                    Change to HIDE
                   </DropdownItem>
                 </DropdownMenu>
               </Dropdown>
@@ -669,7 +796,7 @@ export default function TronBitTorrentIssues(): JSX.Element {
           return <span className="text-white">{cellValue}</span>;
       }
     },
-    [],
+    [handlePRAction],
   );
 
   /* ------------------------------------------------------------------
@@ -1159,7 +1286,7 @@ export default function TronBitTorrentIssues(): JSX.Element {
                   variant="bordered"
                   value={projectNameValue}
                   onValueChange={setProjectNameValue}
-                  style={{ color: 'white' }}
+                  style={{ color: "white" }}
                 />
                 <Input
                   label="Description"
@@ -1169,7 +1296,7 @@ export default function TronBitTorrentIssues(): JSX.Element {
                   size="md"
                   value={projectDescriptionValue}
                   onValueChange={setProjectDescriptionValue}
-                  style={{ color: 'white' }}
+                  style={{ color: "white" }}
                 />
               </ModalBody>
               <ModalFooter>
@@ -1215,7 +1342,7 @@ export default function TronBitTorrentIssues(): JSX.Element {
                   variant="bordered"
                   value={issueTitleValue}
                   onValueChange={setIssueTitleValue}
-                  style={{ color: 'white' }}
+                  style={{ color: "white" }}
                 />
                 <Input
                   label="Description"
@@ -1224,7 +1351,7 @@ export default function TronBitTorrentIssues(): JSX.Element {
                   variant="faded"
                   value={issueDescriptionValue}
                   onValueChange={setIssueDescriptionValue}
-                  style={{ color: 'white' }}
+                  style={{ color: "white" }}
                 />
               </ModalBody>
               <ModalFooter>
