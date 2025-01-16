@@ -165,6 +165,9 @@ export default function TronBitTorrentIssues(): JSX.Element {
   const [hasMetamask, setHasMetamask] = useState<boolean>(false);
   const [signer, setSigner] = useState<ethers.JsonRpcSigner | null>(null);
 
+  // New state to track transaction pending
+  const [isTransactionPending, setIsTransactionPending] = useState<boolean>(false);
+
   const {
     isOpen: isPRModalOpen,
     onOpen: onPRModalOpen,
@@ -297,12 +300,23 @@ export default function TronBitTorrentIssues(): JSX.Element {
 
     const contract = new ethers.Contract(CONTRACT_ADDRESS, abi, signer);
     try {
-      await contract.addNewIntegration(_IRTitle, _IRDescription);
+      // Show "It's working..." overlay
+      setIsTransactionPending(true);
+
+      // Send transaction
+      const tx = await contract.addNewIntegration(_IRTitle, _IRDescription);
+      // Wait for confirmation
+      await tx.wait();
+
+      // Hide overlay
+      setIsTransactionPending(false);
+
       setProjectNameValue("");
       setProjectDescriptionValue("");
       void getIntegrationStatus();
     } catch (error) {
       console.error(error);
+      setIsTransactionPending(false);
     }
   }
 
@@ -319,12 +333,23 @@ export default function TronBitTorrentIssues(): JSX.Element {
 
     const contract = new ethers.Contract(CONTRACT_ADDRESS, abi, signer);
     try {
-      await contract.addNewIssue(_PRTitle, _PRDescription);
+      // Show "It's working..." overlay
+      setIsTransactionPending(true);
+
+      // Send transaction
+      const tx = await contract.addNewIssue(_PRTitle, _PRDescription);
+      // Wait for confirmation
+      await tx.wait();
+
+      // Hide overlay
+      setIsTransactionPending(false);
+
       setIssueTitleValue("");
       setIssueDescriptionValue("");
       void getProblemReports();
     } catch (error) {
       console.error(error);
+      setIsTransactionPending(false);
     }
   }
 
@@ -1024,8 +1049,18 @@ export default function TronBitTorrentIssues(): JSX.Element {
      Render
      ------------------------------------------------------------------ */
 
+  // If a transaction is pending, show a simple overlay
   return (
     <main className="dark flex min-h-screen flex-col items-center justify-between p-3">
+      {isTransactionPending && (
+        <div
+          className="fixed top-0 left-0 flex items-center justify-center w-screen h-screen bg-black bg-opacity-70 z-50"
+          style={{ backdropFilter: "blur(3px)" }}
+        >
+          <p className="text-white text-lg">It's working...</p>
+        </div>
+      )}
+
       <Navbar
         isBordered
         disableAnimation
