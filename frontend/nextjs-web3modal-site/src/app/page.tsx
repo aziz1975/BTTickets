@@ -555,8 +555,10 @@ export default function TronBitTorrentIssues(): JSX.Element {
                   </Button>
                 </DropdownTrigger>
                 <DropdownMenu>
-                  <DropdownItem>Up Vote</DropdownItem>
-                  <DropdownItem>Change Status</DropdownItem>
+                  <DropdownItem style={{ color: "white" }}>Up Vote</DropdownItem>
+                  <DropdownItem style={{ color: "white" }}>
+                    Change Status
+                  </DropdownItem>
                 </DropdownMenu>
               </Dropdown>
             </div>
@@ -629,8 +631,10 @@ export default function TronBitTorrentIssues(): JSX.Element {
                   </Button>
                 </DropdownTrigger>
                 <DropdownMenu>
-                  <DropdownItem>Up Vote</DropdownItem>
-                  <DropdownItem>Change Status</DropdownItem>
+                  <DropdownItem style={{ color: "white" }}>Up Vote</DropdownItem>
+                  <DropdownItem style={{ color: "white" }}>
+                    Change Status
+                  </DropdownItem>
                 </DropdownMenu>
               </Dropdown>
             </div>
@@ -705,8 +709,7 @@ export default function TronBitTorrentIssues(): JSX.Element {
                   endContent={<ChevronDownIcon className="text-small" />}
                   size="sm"
                   variant="flat"
-                  // "Status" text color = white
-                  style={{ color: "white" }}
+                  style={{ color: "white" }} // "Status" text color = white
                 >
                   Status
                 </Button>
@@ -723,7 +726,11 @@ export default function TronBitTorrentIssues(): JSX.Element {
                 className="dark"
               >
                 {statusOptions.map((status) => (
-                  <DropdownItem key={status.uid} className="capitalize">
+                  <DropdownItem
+                    key={status.uid}
+                    className="capitalize"
+                    style={{ color: "white" }}
+                  >
                     {capitalize(status.name)}
                   </DropdownItem>
                 ))}
@@ -736,8 +743,7 @@ export default function TronBitTorrentIssues(): JSX.Element {
                   endContent={<ChevronDownIcon className="text-small" />}
                   size="sm"
                   variant="flat"
-                  // "Columns" text color = white
-                  style={{ color: "white" }}
+                  style={{ color: "white" }} // "Columns" text color = white
                 >
                   Columns
                 </Button>
@@ -754,13 +760,18 @@ export default function TronBitTorrentIssues(): JSX.Element {
                 className="dark"
               >
                 {columns.map((column) => (
-                  <DropdownItem key={column.uid} className="capitalize">
+                  <DropdownItem
+                    key={column.uid}
+                    className="capitalize"
+                    style={{ color: "white" }}
+                  >
                     {capitalize(column.name)}
                   </DropdownItem>
                 ))}
               </DropdownMenu>
             </Dropdown>
 
+            {/* Removed the "Create PR" button from here */}
             <Button
               className="bg-foreground text-background"
               endContent={<PlusIcon width={undefined} height={undefined} />}
@@ -768,15 +779,6 @@ export default function TronBitTorrentIssues(): JSX.Element {
               onPress={onIntegrationModalOpen}
             >
               Request Integration
-            </Button>
-
-            <Button
-              className="bg-foreground text-background"
-              endContent={<PlusIcon width={undefined} height={undefined} />}
-              size="sm"
-              onPress={onPRModalOpen}
-            >
-              Create PR
             </Button>
           </div>
         </div>
@@ -806,7 +808,6 @@ export default function TronBitTorrentIssues(): JSX.Element {
     onRowsPerPageChange,
     users.length,
     onIntegrationModalOpen,
-    onPRModalOpen,
   ]);
 
   const bottomContent = useMemo(() => {
@@ -885,7 +886,11 @@ export default function TronBitTorrentIssues(): JSX.Element {
                 className="dark"
               >
                 {statusOptions.map((status) => (
-                  <DropdownItem key={status.uid} className="capitalize">
+                  <DropdownItem
+                    key={status.uid}
+                    className="capitalize"
+                    style={{ color: "white" }}
+                  >
                     {capitalize(status.name)}
                   </DropdownItem>
                 ))}
@@ -915,12 +920,26 @@ export default function TronBitTorrentIssues(): JSX.Element {
                 className="dark"
               >
                 {prColumns.map((column) => (
-                  <DropdownItem key={column.uid} className="capitalize">
+                  <DropdownItem
+                    key={column.uid}
+                    className="capitalize"
+                    style={{ color: "white" }}
+                  >
                     {capitalize(column.name)}
                   </DropdownItem>
                 ))}
               </DropdownMenu>
             </Dropdown>
+
+            {/* Moved "Create PR" button here */}
+            <Button
+              className="bg-foreground text-background"
+              endContent={<PlusIcon width={undefined} height={undefined} />}
+              size="sm"
+              onPress={onPRModalOpen}
+            >
+              Create PR
+            </Button>
           </div>
         </div>
         <div className="flex justify-between items-center">
@@ -948,6 +967,7 @@ export default function TronBitTorrentIssues(): JSX.Element {
     onPRSearchChange,
     onPRRowsPerPageChange,
     prRequests.length,
+    onPRModalOpen,
   ]);
 
   const prBottomContent = useMemo(() => {
@@ -1065,7 +1085,7 @@ export default function TronBitTorrentIssues(): JSX.Element {
                 </Button>
               )
             ) : (
-              <Button isDisabled color="default" variant="ghost">
+              <Button isDisabled color="danger" variant="ghost">
                 Wallet Not Detected
               </Button>
             )}
@@ -1093,7 +1113,7 @@ export default function TronBitTorrentIssues(): JSX.Element {
         <ModalContent>
           {(onClose) => (
             <>
-              <ModalHeader className="flex flex-col gap-1">
+              <ModalHeader className="flex flex-col gap-1 text-white">
                 Project Integration Request
               </ModalHeader>
               <ModalBody>
@@ -1104,6 +1124,7 @@ export default function TronBitTorrentIssues(): JSX.Element {
                   variant="bordered"
                   value={projectNameValue}
                   onValueChange={setProjectNameValue}
+                  style={{ color: 'white' }}
                 />
                 <Input
                   label="Description"
@@ -1113,6 +1134,7 @@ export default function TronBitTorrentIssues(): JSX.Element {
                   size="md"
                   value={projectDescriptionValue}
                   onValueChange={setProjectDescriptionValue}
+                  style={{ color: 'white' }}
                 />
               </ModalBody>
               <ModalFooter>
@@ -1147,7 +1169,7 @@ export default function TronBitTorrentIssues(): JSX.Element {
         <ModalContent>
           {(onClose) => (
             <>
-              <ModalHeader className="flex flex-col gap-1">
+              <ModalHeader className="flex flex-col gap-1 text-white">
                 New Problem Report
               </ModalHeader>
               <ModalBody>
@@ -1158,6 +1180,7 @@ export default function TronBitTorrentIssues(): JSX.Element {
                   variant="bordered"
                   value={issueTitleValue}
                   onValueChange={setIssueTitleValue}
+                  style={{ color: 'white' }}
                 />
                 <Input
                   label="Description"
@@ -1166,6 +1189,7 @@ export default function TronBitTorrentIssues(): JSX.Element {
                   variant="faded"
                   value={issueDescriptionValue}
                   onValueChange={setIssueDescriptionValue}
+                  style={{ color: 'white' }}
                 />
               </ModalBody>
               <ModalFooter>
@@ -1191,8 +1215,11 @@ export default function TronBitTorrentIssues(): JSX.Element {
       </Modal>
 
       {/* -------------------------------------------
-          Integrations Table (TOP)
+          Headings & Integrations Table
           -----------------------------------------*/}
+      <h3 style={{ color: "Black", marginTop: "1rem" }}>
+        Integration Requests
+      </h3>
       <div className="flex justify-center w-full mt-5">
         <Table
           isCompact
@@ -1241,8 +1268,9 @@ export default function TronBitTorrentIssues(): JSX.Element {
       </div>
 
       {/* -------------------------------------------
-          Problem Reports Table (BOTTOM)
+          Headings & Problem Reports Table
           -----------------------------------------*/}
+      <h3 style={{ color: "Black", marginTop: "1rem" }}>Problem Reports</h3>
       <div className="flex justify-center w-full mt-12">
         <Table
           isCompact
