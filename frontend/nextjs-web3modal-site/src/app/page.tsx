@@ -1234,7 +1234,7 @@ export default function TronBitTorrentIssues(): JSX.Element {
             {hasMetamask ? (
               isConnected ? (
                 <Button
-                  style={{ backgroundColor: "#00008B", color: "#ffffff" }}
+                  style={{ backgroundColor: "#006400", color: "#ffffff" }}
                 >
                   Connected
                 </Button>
