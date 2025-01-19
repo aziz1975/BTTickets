@@ -48,7 +48,11 @@ export function WalletProvider({ children }: PropsWithChildren) {
 
   // Check for Metamask on mount
   useEffect(() => {
-    if (typeof window.ethereum !== "undefined") {
+    if (
+      typeof window !== "undefined" &&
+      window.ethereum &&
+      window.ethereum.isMetaMask
+    ) {
       setHasMetamask(true);
     }
   }, []);
@@ -58,7 +62,7 @@ export function WalletProvider({ children }: PropsWithChildren) {
     if (!Web3Modal) return;
 
     const web3Modal = new Web3Modal({
-      cacheProvider: true, // <-- ensures the provider is cached
+      cacheProvider: true, // ensures the provider is cached
       providerOptions,
     });
 
@@ -69,7 +73,7 @@ export function WalletProvider({ children }: PropsWithChildren) {
   }, []);
 
   async function connect(): Promise<void> {
-    if (typeof window.ethereum === "undefined" || !Web3Modal) {
+    if (!Web3Modal) {
       setIsConnected(false);
       return;
     }
@@ -81,12 +85,13 @@ export function WalletProvider({ children }: PropsWithChildren) {
         providerOptions,
       });
 
-      // Open modal or auto-connect if cached
-      await web3Modal.connect();
+      const externalProvider = await web3Modal.connect();
+      const provider = new ethers.BrowserProvider(externalProvider);
 
-      const provider = new ethers.BrowserProvider(window.ethereum);
+      // Force Metamask to prompt for accounts if not already granted
+      await provider.send("eth_requestAccounts", []);
+
       const _signer = await provider.getSigner();
-
       console.log("Signer address:", await _signer.getAddress());
 
       setSigner(_signer);
