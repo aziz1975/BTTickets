@@ -46,15 +46,33 @@ export function WalletProvider({ children }: PropsWithChildren) {
   const [isConnected, setIsConnected] = useState<boolean>(false);
   const [signer, setSigner] = useState<ethers.JsonRpcSigner | null>(null);
 
-  // Check for Metamask on mount
+  // Check for Metamask on mount (with fallback if user logs in after page load)
   useEffect(() => {
-    if (
-      typeof window !== "undefined" &&
-      window.ethereum &&
-      window.ethereum.isMetaMask
-    ) {
-      setHasMetamask(true);
+    function checkMetamask() {
+      if (
+        typeof window !== "undefined" &&
+        window.ethereum &&
+        window.ethereum.isMetaMask
+      ) {
+        setHasMetamask(true);
+      } else {
+        setHasMetamask(false);
+      }
     }
+
+    // Do the initial check:
+    checkMetamask();
+
+    // Listen for 'ethereum#initialized' event in case MetaMask 
+    // was injected after initial load. The `{ once: true }` ensures 
+    // we run it only the first time the event fires.
+    window.addEventListener("ethereum#initialized", checkMetamask, {
+      once: true,
+    });
+
+    return () => {
+      window.removeEventListener("ethereum#initialized", checkMetamask);
+    };
   }, []);
 
   // If there's a cached provider, automatically connect
