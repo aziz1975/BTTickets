@@ -106,11 +106,9 @@ const CONTRACT_ADDRESS = "0xf4b6085ae33f073ee7D20ab4F6b79158C8F7889E";
 
 // Helper to parse "IR-4" -> 4n
 function parseIntegrationId(idStr: string): bigint {
-  // If it starts with "IR-", strip off the first 3 chars and parse the remainder
   if (idStr.startsWith("IR-")) {
     return BigInt(idStr.slice(3));
   }
-  // Otherwise, fallback
   return BigInt(idStr);
 }
 
@@ -175,7 +173,6 @@ export default function IntegrationsPage() {
       const contract = new ethers.Contract(CONTRACT_ADDRESS, abi, signer);
       const fetchedUsers = await contract.getIntegrationsList();
 
-      // EXACT SAME MAPPING AS YOUR ORIGINAL CODE:
       const mapped: IntegrationRequest[] = fetchedUsers.map((obj: any) => {
         return {
           id: obj[0].toString(),
@@ -193,7 +190,6 @@ export default function IntegrationsPage() {
     }
   }
 
-  // Updated to parse the "IR-" prefix before converting to BigInt
   const handleIntegrationAction = useCallback(
     async (actionKey: Key, integrationId: string) => {
       if (!signer) return;
@@ -201,7 +197,6 @@ export default function IntegrationsPage() {
         setIsTransactionPending(true);
         const contract = new ethers.Contract(CONTRACT_ADDRESS, abi, signer);
 
-        // parse "IR-4" -> 4n
         const index = parseIntegrationId(integrationId);
 
         if (actionKey === "upvote") {
@@ -268,36 +263,33 @@ export default function IntegrationsPage() {
     });
   }, [sortDescriptor, items]);
 
+  // --- Styling fix: remove "text-white" in favor of "text-gray-900 dark:text-gray-100"
   const renderCell = useCallback(
     (user: IntegrationRequest, columnKey: ColumnKey): ReactNode => {
       const cellValue = user[columnKey as keyof IntegrationRequest];
       switch (columnKey) {
         case "id":
           return (
-            <div className="flex flex-col text-white">
-              <p className="text-bold text-small capitalize">{user.id}</p>
+            <div className="flex flex-col text-gray-900 dark:text-gray-100">
+              <p className="text-sm font-bold">{user.id}</p>
             </div>
           );
         case "votes":
           return (
-            <div className="flex flex-col text-white">
-              <p className="text-bold text-small capitalize">
-                {user.votes.toString()}
-              </p>
+            <div className="flex flex-col text-gray-900 dark:text-gray-100">
+              <p className="text-sm font-bold">{user.votes.toString()}</p>
             </div>
           );
         case "title":
           return (
-            <div className="flex flex-col text-white">
-              <p className="text-bold text-sm capitalize text-default-400">
-                {user.title}
-              </p>
+            <div className="flex flex-col text-gray-900 dark:text-gray-100">
+              <p className="text-sm font-semibold">{user.title}</p>
             </div>
           );
         case "status":
           return (
             <Chip
-              className="capitalize border-none gap-1 text-default-600"
+              className="capitalize gap-1 text-gray-900 dark:text-gray-100"
               color={statusColorMap[user.status as StatusColorKey]}
               size="sm"
               variant="dot"
@@ -307,12 +299,16 @@ export default function IntegrationsPage() {
           );
         case "actions":
           return (
-            <div className="relative flex justify-end items-center gap-2 text-white">
-              <Dropdown className="dark bg-background border-1 border-default-200">
+            <div className="relative flex justify-end items-center gap-2 text-gray-900 dark:text-gray-100">
+              <Dropdown
+                className="border-1 border-default-200"
+                // improved background for dropdown
+                placement="bottom-end"
+              >
                 <DropdownTrigger>
                   <Button isIconOnly radius="full" size="sm" variant="light">
                     <VerticalDotsIcon
-                      className="text-default-400"
+                      className="text-gray-900 dark:text-gray-200"
                       width={undefined}
                       height={undefined}
                     />
@@ -321,34 +317,24 @@ export default function IntegrationsPage() {
                 <DropdownMenu
                   aria-label="Integration actions"
                   onAction={(key) => handleIntegrationAction(key, user.id)}
+                  // improved design for clearer dropdown
+                  className="bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
                 >
-                  <DropdownItem key="upvote" style={{ color: "white" }}>
-                    Up Vote
-                  </DropdownItem>
-                  <DropdownItem key="status-0" style={{ color: "white" }}>
-                    Change to NEW
-                  </DropdownItem>
-                  <DropdownItem key="status-1" style={{ color: "white" }}>
-                    Change to IN_REVIEW
-                  </DropdownItem>
-                  <DropdownItem key="status-2" style={{ color: "white" }}>
-                    Change to DEFERRED
-                  </DropdownItem>
-                  <DropdownItem key="status-3" style={{ color: "white" }}>
-                    Change to DONE
-                  </DropdownItem>
-                  <DropdownItem key="status-4" style={{ color: "white" }}>
-                    Change to REJ
-                  </DropdownItem>
-                  <DropdownItem key="status-5" style={{ color: "white" }}>
-                    Change to HIDE
-                  </DropdownItem>
+                  <DropdownItem key="upvote">Up Vote</DropdownItem>
+                  <DropdownItem key="status-0">Change to NEW</DropdownItem>
+                  <DropdownItem key="status-1">Change to IN_REVIEW</DropdownItem>
+                  <DropdownItem key="status-2">Change to DEFERRED</DropdownItem>
+                  <DropdownItem key="status-3">Change to DONE</DropdownItem>
+                  <DropdownItem key="status-4">Change to REJ</DropdownItem>
+                  <DropdownItem key="status-5">Change to HIDE</DropdownItem>
                 </DropdownMenu>
               </Dropdown>
             </div>
           );
         default:
-          return <span className="text-white">{cellValue}</span>;
+          return (
+            <span className="text-gray-900 dark:text-gray-100">{cellValue}</span>
+          );
       }
     },
     [handleIntegrationAction],
@@ -364,17 +350,16 @@ export default function IntegrationsPage() {
     setPage(1);
   }, []);
 
+  // --- Table top content (with improved text color for dropdowns, etc.)
   const topContent = useMemo(() => {
     return (
       <div className="flex flex-col gap-4">
         <div className="flex justify-between gap-3 items-end">
           <Input
             isClearable
-            style={{ color: "white" }}
             classNames={{
               base: "w-full sm:max-w-[34%]",
               inputWrapper: "border-1",
-              input: "text-white",
             }}
             placeholder="Search..."
             size="sm"
@@ -385,13 +370,12 @@ export default function IntegrationsPage() {
             onValueChange={onSearchChange}
           />
           <div className="flex gap-3">
-            <Dropdown className="dark">
+            <Dropdown>
               <DropdownTrigger className="hidden sm:flex">
                 <Button
                   endContent={<ChevronDownIcon className="text-small" />}
                   size="sm"
                   variant="flat"
-                  style={{ color: "white" }}
                 >
                   Status
                 </Button>
@@ -405,27 +389,22 @@ export default function IntegrationsPage() {
                 }
                 selectionMode="multiple"
                 onSelectionChange={(keys) => setStatusFilter(keys as Set<string>)}
-                className="dark"
+                className="bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
               >
                 {statusOptions.map((status) => (
-                  <DropdownItem
-                    key={status.uid}
-                    className="capitalize"
-                    style={{ color: "white" }}
-                  >
+                  <DropdownItem key={status.uid} className="capitalize">
                     {capitalize(status.name)}
                   </DropdownItem>
                 ))}
               </DropdownMenu>
             </Dropdown>
 
-            <Dropdown className="dark">
+            <Dropdown>
               <DropdownTrigger className="hidden sm:flex">
                 <Button
                   endContent={<ChevronDownIcon className="text-small" />}
                   size="sm"
                   variant="flat"
-                  style={{ color: "white" }}
                 >
                   Columns
                 </Button>
@@ -439,14 +418,10 @@ export default function IntegrationsPage() {
                 onSelectionChange={(keys) =>
                   setVisibleColumns(keys as Set<ColumnKey>)
                 }
-                className="dark"
+                className="bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
               >
                 {columns.map((column) => (
-                  <DropdownItem
-                    key={column.uid}
-                    className="capitalize"
-                    style={{ color: "white" }}
-                  >
+                  <DropdownItem key={column.uid} className="capitalize">
                     {capitalize(column.name)}
                   </DropdownItem>
                 ))}
@@ -469,7 +444,7 @@ export default function IntegrationsPage() {
           <label className="flex items-center text-default-400 text-small">
             Rows per page:
             <select
-              className="bg-transparent outline-none text-default-400 text-small"
+              className="bg-transparent outline-none text-default-400 text-small ml-1"
               onChange={onRowsPerPageChange}
             >
               <option value="10">10</option>
@@ -490,6 +465,7 @@ export default function IntegrationsPage() {
     onIntegrationModalOpen,
   ]);
 
+  // --- Table bottom content
   const bottomContent = useMemo(() => {
     const currentItemsCount =
       selectedKeys === "all" ? items.length : selectedKeys.size;
@@ -515,17 +491,17 @@ export default function IntegrationsPage() {
     );
   }, [selectedKeys, items, page, pages]);
 
+  // --- Adjust table classes to have a light background and dark-mode alternative
   const classNames = useMemo(() => {
     return {
       wrapper: ["max-h-[382px]", "w-[90vw]"],
-      th: ["bg-transparent", "text-default-500", "border-b", "border-divider"],
+      table: "bg-white dark:bg-[#1f1f1f]",
+      th: ["bg-transparent", "border-b", "border-divider", "text-gray-900 dark:text-gray-100"],
       td: [
-        "text-white",
-        "group-data-[first=true]:first:before:rounded-none",
-        "group-data-[first=true]:last:before:rounded-none",
-        "group-data-[middle=true]:before:rounded-none",
-        "group-data-[last=true]:first:before:rounded-none",
-        "group-data-[last=true]:last:before:rounded-none",
+        "border-b",
+        "border-divider",
+        "text-gray-900 dark:text-gray-100",
+        "group-data-[first=true]:before:rounded-none",
       ],
     };
   }, []);
@@ -571,7 +547,6 @@ export default function IntegrationsPage() {
                 key={column.uid}
                 align={column.uid === "actions" ? "center" : "start"}
                 allowsSorting={column.sortable}
-                className="dark"
               >
                 {column.name}
               </TableColumn>
@@ -595,12 +570,12 @@ export default function IntegrationsPage() {
         isOpen={isIntegrationModalOpen}
         onOpenChange={onIntegrationModalChange}
         placement="top-center"
-        className="dark"
+        className="dark:bg-[#1f1f1f]"
       >
         <ModalContent>
           {(onClose) => (
             <>
-              <ModalHeader className="flex flex-col gap-1 text-white">
+              <ModalHeader className="flex flex-col gap-1 text-gray-900 dark:text-gray-100">
                 Project Integration Request
               </ModalHeader>
               <ModalBody>
@@ -611,7 +586,7 @@ export default function IntegrationsPage() {
                   variant="bordered"
                   value={projectNameValue}
                   onValueChange={setProjectNameValue}
-                  style={{ color: "white" }}
+                  className="text-gray-900 dark:text-gray-100"
                 />
                 <Input
                   label="Description"
@@ -621,7 +596,7 @@ export default function IntegrationsPage() {
                   size="md"
                   value={projectDescriptionValue}
                   onValueChange={setProjectDescriptionValue}
-                  style={{ color: "white" }}
+                  className="text-gray-900 dark:text-gray-100"
                 />
               </ModalBody>
               <ModalFooter>

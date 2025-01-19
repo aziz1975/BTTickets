@@ -176,7 +176,6 @@ export default function IssuesPage() {
       const contract = new ethers.Contract(CONTRACT_ADDRESS, abi, signer);
       const fetchedIssues = await contract.getPRList();
 
-      // EXACT SAME MAPPING AS YOUR ORIGINAL CODE:
       const mapped: ProblemReport[] = fetchedIssues.map((obj: any) => {
         return {
           id: obj[0].toString(),
@@ -193,7 +192,6 @@ export default function IssuesPage() {
     }
   }
 
-  // Updated to parse the "PR-" prefix before converting to BigInt
   const handlePRAction = useCallback(
     async (actionKey: Key, prId: string) => {
       if (!signer) return;
@@ -202,7 +200,7 @@ export default function IssuesPage() {
         setIsTransactionPending(true);
         const contract = new ethers.Contract(CONTRACT_ADDRESS, abi, signer);
 
-        const index = parseIssueId(prId); // parse "PR-4" -> 4n
+        const index = parseIssueId(prId);
 
         if (actionKey === "upvote") {
           const tx = await contract.upVotePR(index);
@@ -270,36 +268,33 @@ export default function IssuesPage() {
     });
   }, [prSortDescriptor, prItems]);
 
+  // --- Design improvement: switch from text-white to text-gray-900/dark:text-gray-100
   const renderPRCell = useCallback(
     (pr: ProblemReport, columnKey: PRColumnKey): ReactNode => {
       const cellValue = pr[columnKey as keyof ProblemReport];
       switch (columnKey) {
         case "id":
           return (
-            <div className="flex flex-col text-white">
-              <p className="text-bold text-small capitalize">{pr.id}</p>
+            <div className="flex flex-col text-gray-900 dark:text-gray-100">
+              <p className="text-sm font-bold">{pr.id}</p>
             </div>
           );
         case "votes":
           return (
-            <div className="flex flex-col text-white">
-              <p className="text-bold text-small capitalize">
-                {pr.votes.toString()}
-              </p>
+            <div className="flex flex-col text-gray-900 dark:text-gray-100">
+              <p className="text-sm font-bold">{pr.votes.toString()}</p>
             </div>
           );
         case "title":
           return (
-            <div className="flex flex-col text-white">
-              <p className="text-bold text-sm capitalize text-default-400">
-                {pr.title}
-              </p>
+            <div className="flex flex-col text-gray-900 dark:text-gray-100">
+              <p className="text-sm font-semibold">{pr.title}</p>
             </div>
           );
         case "status":
           return (
             <Chip
-              className="capitalize border-none gap-1 text-default-600"
+              className="capitalize gap-1 text-gray-900 dark:text-gray-100"
               color={statusColorMap[pr.status as StatusColorKey]}
               size="sm"
               variant="dot"
@@ -309,12 +304,15 @@ export default function IssuesPage() {
           );
         case "actions":
           return (
-            <div className="relative flex justify-end items-center gap-2 text-white">
-              <Dropdown className="dark bg-background border-1 border-default-200">
+            <div className="relative flex justify-end items-center gap-2 text-gray-900 dark:text-gray-100">
+              <Dropdown
+                className="border-1 border-default-200"
+                placement="bottom-end"
+              >
                 <DropdownTrigger>
                   <Button isIconOnly radius="full" size="sm" variant="light">
                     <VerticalDotsIcon
-                      className="text-default-400"
+                      className="text-gray-900 dark:text-gray-200"
                       width={undefined}
                       height={undefined}
                     />
@@ -323,34 +321,23 @@ export default function IssuesPage() {
                 <DropdownMenu
                   aria-label="PR actions"
                   onAction={(key) => handlePRAction(key, pr.id)}
+                  className="bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
                 >
-                  <DropdownItem key="upvote" style={{ color: "white" }}>
-                    Up Vote
-                  </DropdownItem>
-                  <DropdownItem key="status-0" style={{ color: "white" }}>
-                    Change to NEW
-                  </DropdownItem>
-                  <DropdownItem key="status-1" style={{ color: "white" }}>
-                    Change to IN_REVIEW
-                  </DropdownItem>
-                  <DropdownItem key="status-2" style={{ color: "white" }}>
-                    Change to DEFERRED
-                  </DropdownItem>
-                  <DropdownItem key="status-3" style={{ color: "white" }}>
-                    Change to DONE
-                  </DropdownItem>
-                  <DropdownItem key="status-4" style={{ color: "white" }}>
-                    Change to REJ
-                  </DropdownItem>
-                  <DropdownItem key="status-5" style={{ color: "white" }}>
-                    Change to HIDE
-                  </DropdownItem>
+                  <DropdownItem key="upvote">Up Vote</DropdownItem>
+                  <DropdownItem key="status-0">Change to NEW</DropdownItem>
+                  <DropdownItem key="status-1">Change to IN_REVIEW</DropdownItem>
+                  <DropdownItem key="status-2">Change to DEFERRED</DropdownItem>
+                  <DropdownItem key="status-3">Change to DONE</DropdownItem>
+                  <DropdownItem key="status-4">Change to REJ</DropdownItem>
+                  <DropdownItem key="status-5">Change to HIDE</DropdownItem>
                 </DropdownMenu>
               </Dropdown>
             </div>
           );
         default:
-          return <span className="text-white">{cellValue}</span>;
+          return (
+            <span className="text-gray-900 dark:text-gray-100">{cellValue}</span>
+          );
       }
     },
     [handlePRAction],
@@ -369,17 +356,16 @@ export default function IssuesPage() {
     setPrPage(1);
   }, []);
 
+  // --- Top content with improved styling
   const prTopContent = useMemo(() => {
     return (
       <div className="flex flex-col gap-4">
         <div className="flex justify-between gap-3 items-end">
           <Input
             isClearable
-            style={{ color: "white" }}
             classNames={{
               base: "w-full sm:max-w-[34%]",
               inputWrapper: "border-1",
-              input: "text-white",
             }}
             placeholder="Search..."
             size="sm"
@@ -390,13 +376,12 @@ export default function IssuesPage() {
             onValueChange={onPRSearchChange}
           />
           <div className="flex gap-3">
-            <Dropdown className="dark">
+            <Dropdown>
               <DropdownTrigger className="hidden sm:flex">
                 <Button
                   endContent={<ChevronDownIcon className="text-small" />}
                   size="sm"
                   variant="flat"
-                  style={{ color: "white" }}
                 >
                   Status
                 </Button>
@@ -410,27 +395,22 @@ export default function IssuesPage() {
                 }
                 selectionMode="multiple"
                 onSelectionChange={(keys) => setPrStatusFilter(keys as Set<string>)}
-                className="dark"
+                className="bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
               >
                 {statusOptions.map((status) => (
-                  <DropdownItem
-                    key={status.uid}
-                    className="capitalize"
-                    style={{ color: "white" }}
-                  >
+                  <DropdownItem key={status.uid} className="capitalize">
                     {capitalize(status.name)}
                   </DropdownItem>
                 ))}
               </DropdownMenu>
             </Dropdown>
 
-            <Dropdown className="dark">
+            <Dropdown>
               <DropdownTrigger className="hidden sm:flex">
                 <Button
                   endContent={<ChevronDownIcon className="text-small" />}
                   size="sm"
                   variant="flat"
-                  style={{ color: "white" }}
                 >
                   Columns
                 </Button>
@@ -444,14 +424,10 @@ export default function IssuesPage() {
                 onSelectionChange={(keys) =>
                   setPrVisibleColumns(keys as Set<PRColumnKey>)
                 }
-                className="dark"
+                className="bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
               >
                 {prColumns.map((column) => (
-                  <DropdownItem
-                    key={column.uid}
-                    className="capitalize"
-                    style={{ color: "white" }}
-                  >
+                  <DropdownItem key={column.uid} className="capitalize">
                     {capitalize(column.name)}
                   </DropdownItem>
                 ))}
@@ -475,7 +451,7 @@ export default function IssuesPage() {
           <label className="flex items-center text-default-400 text-small">
             Rows per page:
             <select
-              className="bg-transparent outline-none text-default-400 text-small"
+              className="bg-transparent outline-none text-default-400 text-small ml-1"
               onChange={onPRRowsPerPageChange}
             >
               <option value="10">10</option>
@@ -496,6 +472,7 @@ export default function IssuesPage() {
     onPRModalOpen,
   ]);
 
+  // --- Bottom content with pagination
   const prBottomContent = useMemo(() => {
     const currentItemsCount =
       prSelectedKeys === "all" ? prItems.length : prSelectedKeys.size;
@@ -521,17 +498,17 @@ export default function IssuesPage() {
     );
   }, [prSelectedKeys, prItems, prPage, prPages]);
 
+  // --- Table class overrides for better readability
   const classNames = useMemo(() => {
     return {
       wrapper: ["max-h-[382px]", "w-[90vw]"],
-      th: ["bg-transparent", "text-default-500", "border-b", "border-divider"],
+      table: "bg-white dark:bg-[#1f1f1f]",
+      th: ["bg-transparent", "border-b", "border-divider", "text-gray-900 dark:text-gray-100"],
       td: [
-        "text-white",
-        "group-data-[first=true]:first:before:rounded-none",
-        "group-data-[first=true]:last:before:rounded-none",
-        "group-data-[middle=true]:before:rounded-none",
-        "group-data-[last=true]:first:before:rounded-none",
-        "group-data-[last=true]:last:before:rounded-none",
+        "border-b",
+        "border-divider",
+        "text-gray-900 dark:text-gray-100",
+        "group-data-[first=true]:before:rounded-none",
       ],
     };
   }, []);
@@ -575,7 +552,6 @@ export default function IssuesPage() {
                 key={column.uid}
                 align={column.uid === "actions" ? "center" : "start"}
                 allowsSorting={column.sortable}
-                className="dark"
               >
                 {column.name}
               </TableColumn>
@@ -599,12 +575,12 @@ export default function IssuesPage() {
         isOpen={isPRModalOpen}
         onOpenChange={onPRModalChange}
         placement="top-center"
-        className="dark"
+        className="dark:bg-[#1f1f1f]"
       >
         <ModalContent>
           {(onClose) => (
             <>
-              <ModalHeader className="flex flex-col gap-1 text-white">
+              <ModalHeader className="flex flex-col gap-1 text-gray-900 dark:text-gray-100">
                 New Problem Report
               </ModalHeader>
               <ModalBody>
@@ -615,7 +591,7 @@ export default function IssuesPage() {
                   variant="bordered"
                   value={issueTitleValue}
                   onValueChange={setIssueTitleValue}
-                  style={{ color: "white" }}
+                  className="text-gray-900 dark:text-gray-100"
                 />
                 <Input
                   label="Description"
@@ -624,7 +600,7 @@ export default function IssuesPage() {
                   variant="faded"
                   value={issueDescriptionValue}
                   onValueChange={setIssueDescriptionValue}
-                  style={{ color: "white" }}
+                  className="text-gray-900 dark:text-gray-100"
                 />
               </ModalBody>
               <ModalFooter>
