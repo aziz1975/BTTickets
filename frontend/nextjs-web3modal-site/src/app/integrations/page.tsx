@@ -48,7 +48,10 @@ import { ChevronDownIcon } from "../assets/ChevronDownIcon"; // Adjust path
 import { capitalize } from "../utils/utils"; // Adjust path
 
 import { useWalletContext } from "../context/WalletContext";
+import dotenv from "dotenv";
 
+// Load environment variables from .env and .env.local
+dotenv.config({ path: "../../../.env" });
 const columns = [
   { name: "ID", uid: "id", sortable: true },
   { name: "Title", uid: "title", sortable: true },
@@ -102,7 +105,8 @@ const INITIAL_VISIBLE_COLUMNS: ColumnKey[] = [
   "actions",
 ];
 
-const CONTRACT_ADDRESS = "0xf4b6085ae33f073ee7D20ab4F6b79158C8F7889E";
+const CONTRACT_ADDRESS = process.env.CONTRACT_ADDRESS as string;
+console.log(CONTRACT_ADDRESS);
 
 // Helper to parse "IR-4" -> 4n
 function parseIntegrationId(idStr: string): bigint {

@@ -19,6 +19,7 @@
     "@nextui-org/table": "^2.0.39",
     "@nextui-org/theme": "^2.2.9",
     "@walletconnect/web3-provider": "^1.8.0",
+    "dotenv": "^16.4.7",
     "ethers": "^6.13.4",
     "framer-motion": "^11.3.24",
     "next": "14.2.5",

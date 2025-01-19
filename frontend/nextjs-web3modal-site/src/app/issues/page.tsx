@@ -48,6 +48,11 @@ import { capitalize } from "../utils/utils"; // Adjust path
 
 import { useWalletContext } from "../context/WalletContext";
 
+import dotenv from "dotenv";
+
+// Load environment variables from .env and .env.local
+dotenv.config({ path: "../../../.env" });
+
 const prColumns = [
   { name: "ID", uid: "id", sortable: true },
   { name: "Title", uid: "title", sortable: true },
@@ -106,7 +111,7 @@ const INITIAL_VISIBLE_COLUMNS: PRColumnKey[] = [
   "actions",
 ];
 
-const CONTRACT_ADDRESS = "0xf4b6085ae33f073ee7D20ab4F6b79158C8F7889E";
+const CONTRACT_ADDRESS = process.env.CONTRACT_ADDRESS as string;
 
 // Helper to parse "PR-4" -> 4n
 function parseIssueId(idStr: string): bigint {
