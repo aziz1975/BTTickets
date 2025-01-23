@@ -5,12 +5,11 @@
 import React, {
   useEffect,
   useState,
-  useCallback,
   ReactNode,
   ChangeEvent,
   useMemo,
 } from "react";
-import { ethers } from "ethers";
+import { ethers, getAddress } from "ethers";
 import {
   Modal,
   ModalContent,
@@ -84,12 +83,7 @@ interface ProblemReport {
 type PRColumnKey = keyof ProblemReport | "actions";
 
 type StatusColorKey = "0" | "1" | "2" | "3" | "4" | "5";
-type StatusColorValue =
-  | "primary"
-  | "warning"
-  | "default"
-  | "success"
-  | "danger";
+type StatusColorValue = "primary" | "warning" | "default" | "success" | "danger";
 type StatusColorMap = Record<StatusColorKey, StatusColorValue>;
 
 const statusColorMap: StatusColorMap = {
@@ -113,7 +107,7 @@ const INITIAL_VISIBLE_COLUMNS: PRColumnKey[] = [
 
 const CONTRACT_ADDRESS = process.env.CONTRACT_ADDRESS as string;
 
-// Helper to parse "PR-4" -> 4n
+// Helper to parse "PR-4" -> BigInt(4)
 function parseIssueId(idStr: string): bigint {
   if (idStr.startsWith("PR-")) {
     return BigInt(idStr.slice(3));
@@ -150,6 +144,9 @@ export default function IssuesPage() {
 
   const [issueTitleValue, setIssueTitleValue] = useState<string>("");
   const [issueDescriptionValue, setIssueDescriptionValue] = useState<string>("");
+
+  // State to check if user is contract owner
+  const [isOwner, setIsOwner] = useState<boolean>(false);
 
   useEffect(() => {
     if (isConnected) {
@@ -192,38 +189,59 @@ export default function IssuesPage() {
         };
       });
       setPrRequests(mapped);
+
+      const owner = await contract.owner();
+      const userAddr = await signer.getAddress();
+
+      // Debug logs
+      console.log("----- IssuesPage Debug -----");
+      console.log("Raw contract owner from contract:", owner);
+      console.log("Raw user address from signer:", userAddr);
+      console.log("Checksummed owner:", getAddress(owner));
+      console.log("Checksummed user:", getAddress(userAddr));
+      console.log(
+        "Comparing checksummed addresses: ",
+        getAddress(owner) === getAddress(userAddr),
+      );
+
+      setIsOwner(getAddress(owner) === getAddress(userAddr));
     } catch (error) {
       console.error(error);
     }
   }
 
-  const handlePRAction = useCallback(
-    async (actionKey: Key, prId: string) => {
-      if (!signer) return;
+  // REMOVED useCallback to ensure updated state is used
+  async function handlePRAction(actionKey: Key, prId: string) {
+    console.log("handlePRAction => isOwner:", isOwner, "action:", actionKey);
 
-      try {
-        setIsTransactionPending(true);
-        const contract = new ethers.Contract(CONTRACT_ADDRESS, abi, signer);
+    if (!signer) return;
 
-        const index = parseIssueId(prId);
+    try {
+      setIsTransactionPending(true);
+      const contract = new ethers.Contract(CONTRACT_ADDRESS, abi, signer);
 
-        if (actionKey === "upvote") {
-          const tx = await contract.upVotePR(index);
-          await tx.wait();
-        } else if ((actionKey as string).startsWith("status-")) {
-          const newStatus = parseInt((actionKey as string).split("-")[1], 10);
-          const tx = await contract.updatePRStatus(index, newStatus);
-          await tx.wait();
+      const index = parseIssueId(prId);
+
+      if (actionKey === "upvote") {
+        const tx = await contract.upVotePR(index);
+        await tx.wait();
+      } else if ((actionKey as string).startsWith("status-")) {
+        if (!isOwner) {
+          alert("Only the owner can change the status");
+          setIsTransactionPending(false);
+          return;
         }
-        setIsTransactionPending(false);
-        await getProblemReports();
-      } catch (error) {
-        setIsTransactionPending(false);
-        console.error(error);
+        const newStatus = parseInt((actionKey as string).split("-")[1], 10);
+        const tx = await contract.updatePRStatus(index, newStatus);
+        await tx.wait();
       }
-    },
-    [signer, getProblemReports],
-  );
+      setIsTransactionPending(false);
+      await getProblemReports();
+    } catch (error) {
+      setIsTransactionPending(false);
+      console.error(error);
+    }
+  }
 
   const hasPRSearchFilter = Boolean(prFilterValue);
 
@@ -273,95 +291,87 @@ export default function IssuesPage() {
     });
   }, [prSortDescriptor, prItems]);
 
-  // --- Design improvement: switch from text-white to text-gray-900/dark:text-gray-100
-  const renderPRCell = useCallback(
-    (pr: ProblemReport, columnKey: PRColumnKey): ReactNode => {
-      const cellValue = pr[columnKey as keyof ProblemReport];
-      switch (columnKey) {
-        case "id":
-          return (
-            <div className="flex flex-col text-gray-900 dark:text-gray-100">
-              <p className="text-sm font-bold">{pr.id}</p>
-            </div>
-          );
-        case "votes":
-          return (
-            <div className="flex flex-col text-gray-900 dark:text-gray-100">
-              <p className="text-sm font-bold">{pr.votes.toString()}</p>
-            </div>
-          );
-        case "title":
-          return (
-            <div className="flex flex-col text-gray-900 dark:text-gray-100">
-              <p className="text-sm font-semibold">{pr.title}</p>
-            </div>
-          );
-        case "status":
-          return (
-            <Chip
-              className="capitalize gap-1 text-gray-900 dark:text-gray-100"
-              color={statusColorMap[pr.status as StatusColorKey]}
-              size="sm"
-              variant="dot"
+  function renderPRCell(pr: ProblemReport, columnKey: PRColumnKey): ReactNode {
+    const cellValue = pr[columnKey as keyof ProblemReport];
+    switch (columnKey) {
+      case "id":
+        return (
+          <div className="flex flex-col text-gray-900 dark:text-gray-100">
+            <p className="text-sm font-bold">{pr.id}</p>
+          </div>
+        );
+      case "votes":
+        return (
+          <div className="flex flex-col text-gray-900 dark:text-gray-100">
+            <p className="text-sm font-bold">{pr.votes.toString()}</p>
+          </div>
+        );
+      case "title":
+        return (
+          <div className="flex flex-col text-gray-900 dark:text-gray-100">
+            <p className="text-sm font-semibold">{pr.title}</p>
+          </div>
+        );
+      case "status":
+        return (
+          <Chip
+            className="capitalize gap-1 text-gray-900 dark:text-gray-100"
+            color={statusColorMap[pr.status as StatusColorKey]}
+            size="sm"
+            variant="dot"
+          >
+            {pr.status}
+          </Chip>
+        );
+      case "actions":
+        return (
+          <div className="relative flex justify-end items-center gap-2 text-gray-900 dark:text-gray-100">
+            <Dropdown
+              className="border-1 border-default-200"
+              placement="bottom-end"
             >
-              {pr.status}
-            </Chip>
-          );
-        case "actions":
-          return (
-            <div className="relative flex justify-end items-center gap-2 text-gray-900 dark:text-gray-100">
-              <Dropdown
-                className="border-1 border-default-200"
-                placement="bottom-end"
+              <DropdownTrigger>
+                <Button isIconOnly radius="full" size="sm" variant="light">
+                  <VerticalDotsIcon
+                    className="text-gray-900 dark:text-gray-200"
+                    width={undefined}
+                    height={undefined}
+                  />
+                </Button>
+              </DropdownTrigger>
+              <DropdownMenu
+                aria-label="PR actions"
+                onAction={(key) => handlePRAction(key, pr.id)}
+                className="bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
               >
-                <DropdownTrigger>
-                  <Button isIconOnly radius="full" size="sm" variant="light">
-                    <VerticalDotsIcon
-                      className="text-gray-900 dark:text-gray-200"
-                      width={undefined}
-                      height={undefined}
-                    />
-                  </Button>
-                </DropdownTrigger>
-                <DropdownMenu
-                  aria-label="PR actions"
-                  onAction={(key) => handlePRAction(key, pr.id)}
-                  className="bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
-                >
-                  <DropdownItem key="upvote">Up Vote</DropdownItem>
-                  <DropdownItem key="status-0">Change to NEW</DropdownItem>
-                  <DropdownItem key="status-1">Change to IN_REVIEW</DropdownItem>
-                  <DropdownItem key="status-2">Change to DEFERRED</DropdownItem>
-                  <DropdownItem key="status-3">Change to DONE</DropdownItem>
-                  <DropdownItem key="status-4">Change to REJ</DropdownItem>
-                  <DropdownItem key="status-5">Change to HIDE</DropdownItem>
-                </DropdownMenu>
-              </Dropdown>
-            </div>
-          );
-        default:
-          return (
-            <span className="text-gray-900 dark:text-gray-100">{cellValue}</span>
-          );
-      }
-    },
-    [handlePRAction],
-  );
+                <DropdownItem key="upvote">Up Vote</DropdownItem>
+                <DropdownItem key="status-0">Change to NEW</DropdownItem>
+                <DropdownItem key="status-1">Change to IN_REVIEW</DropdownItem>
+                <DropdownItem key="status-2">Change to DEFERRED</DropdownItem>
+                <DropdownItem key="status-3">Change to DONE</DropdownItem>
+                <DropdownItem key="status-4">Change to REJ</DropdownItem>
+                <DropdownItem key="status-5">Change to HIDE</DropdownItem>
+              </DropdownMenu>
+            </Dropdown>
+          </div>
+        );
+      default:
+        return (
+          <span className="text-gray-900 dark:text-gray-100">{cellValue}</span>
+        );
+    }
+  }
 
-  const onPRRowsPerPageChange = useCallback(
-    (e: ChangeEvent<HTMLSelectElement>) => {
-      setPrRowsPerPage(Number(e.target.value));
-      setPrPage(1);
-    },
-    [],
-  );
+  function onPRRowsPerPageChange(e: ChangeEvent<HTMLSelectElement>) {
+    setPrRowsPerPage(Number(e.target.value));
+    setPrPage(1);
+  }
 
-  const onPRSearchChange = useCallback((value: string) => {
+  function onPRSearchChange(value: string) {
     setPrFilterValue(value);
     setPrPage(1);
-  }, []);
+  }
 
-  // --- Top content with improved styling
   const prTopContent = useMemo(() => {
     return (
       <div className="flex flex-col gap-4">
@@ -471,13 +481,12 @@ export default function IssuesPage() {
     prFilterValue,
     prStatusFilter,
     prVisibleColumns,
+    prRequests.length,
     onPRSearchChange,
     onPRRowsPerPageChange,
-    prRequests.length,
     onPRModalOpen,
   ]);
 
-  // --- Bottom content with pagination
   const prBottomContent = useMemo(() => {
     const currentItemsCount =
       prSelectedKeys === "all" ? prItems.length : prSelectedKeys.size;
@@ -503,12 +512,16 @@ export default function IssuesPage() {
     );
   }, [prSelectedKeys, prItems, prPage, prPages]);
 
-  // --- Table class overrides for better readability
   const classNames = useMemo(() => {
     return {
       wrapper: ["max-h-[382px]", "w-[90vw]"],
       table: "bg-white dark:bg-[#1f1f1f]",
-      th: ["bg-transparent", "border-b", "border-divider", "text-gray-900 dark:text-gray-100"],
+      th: [
+        "bg-transparent",
+        "border-b",
+        "border-divider",
+        "text-gray-900 dark:text-gray-100",
+      ],
       td: [
         "border-b",
         "border-divider",
@@ -566,9 +579,7 @@ export default function IssuesPage() {
             {(item) => (
               <TableRow key={item.id}>
                 {(columnKey) => (
-                  <TableCell>
-                    {renderPRCell(item, columnKey as PRColumnKey)}
-                  </TableCell>
+                  <TableCell>{renderPRCell(item, columnKey as PRColumnKey)}</TableCell>
                 )}
               </TableRow>
             )}

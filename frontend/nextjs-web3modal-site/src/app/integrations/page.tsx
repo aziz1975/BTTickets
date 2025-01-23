@@ -5,13 +5,12 @@
 import React, {
   useEffect,
   useState,
-  useCallback,
   ReactNode,
   ChangeEvent,
   useMemo,
 } from "react";
 import WalletConnectProvider from "@walletconnect/web3-provider";
-import { ethers } from "ethers";
+import { ethers, getAddress } from "ethers";
 import {
   Modal,
   ModalContent,
@@ -52,6 +51,7 @@ import dotenv from "dotenv";
 
 // Load environment variables from .env and .env.local
 dotenv.config({ path: "../../../.env" });
+
 const columns = [
   { name: "ID", uid: "id", sortable: true },
   { name: "Title", uid: "title", sortable: true },
@@ -106,9 +106,8 @@ const INITIAL_VISIBLE_COLUMNS: ColumnKey[] = [
 ];
 
 const CONTRACT_ADDRESS = process.env.CONTRACT_ADDRESS as string;
-console.log(CONTRACT_ADDRESS);
 
-// Helper to parse "IR-4" -> 4n
+// Helper to parse "IR-4" -> BigInt(4)
 function parseIntegrationId(idStr: string): bigint {
   if (idStr.startsWith("IR-")) {
     return BigInt(idStr.slice(3));
@@ -147,6 +146,9 @@ export default function IntegrationsPage() {
   const [projectDescriptionValue, setProjectDescriptionValue] = useState<string>(
     "",
   );
+
+  // State to track if connected user is owner
+  const [isOwner, setIsOwner] = useState<boolean>(false);
 
   useEffect(() => {
     if (isConnected) {
@@ -189,37 +191,58 @@ export default function IntegrationsPage() {
       });
 
       setUsers(mapped);
+
+      const owner = await contract.owner();
+      const userAddr = await signer.getAddress();
+
+      // Debug logs
+      console.log("----- IntegrationsPage Debug -----");
+      console.log("Raw contract owner from contract:", owner);
+      console.log("Raw user address from signer:", userAddr);
+      console.log("Checksummed owner:", getAddress(owner));
+      console.log("Checksummed user:", getAddress(userAddr));
+      console.log(
+        "Comparing checksummed addresses: ",
+        getAddress(owner) === getAddress(userAddr),
+      );
+
+      setIsOwner(getAddress(owner) === getAddress(userAddr));
     } catch (error) {
       console.error(error);
     }
   }
 
-  const handleIntegrationAction = useCallback(
-    async (actionKey: Key, integrationId: string) => {
-      if (!signer) return;
-      try {
-        setIsTransactionPending(true);
-        const contract = new ethers.Contract(CONTRACT_ADDRESS, abi, signer);
+  // REMOVED useCallback to ensure updated state is used
+  async function handleIntegrationAction(actionKey: Key, integrationId: string) {
+    console.log("handleIntegrationAction => isOwner:", isOwner, "action:", actionKey);
 
-        const index = parseIntegrationId(integrationId);
+    if (!signer) return;
+    try {
+      setIsTransactionPending(true);
+      const contract = new ethers.Contract(CONTRACT_ADDRESS, abi, signer);
 
-        if (actionKey === "upvote") {
-          const tx = await contract.upVoteIR(index);
-          await tx.wait();
-        } else if ((actionKey as string).startsWith("status-")) {
-          const newStatus = parseInt((actionKey as string).split("-")[1], 10);
-          const tx = await contract.updateIRStatus(index, newStatus);
-          await tx.wait();
+      const index = parseIntegrationId(integrationId);
+
+      if (actionKey === "upvote") {
+        const tx = await contract.upVoteIR(index);
+        await tx.wait();
+      } else if ((actionKey as string).startsWith("status-")) {
+        if (!isOwner) {
+          alert("Only the owner can change the status");
+          setIsTransactionPending(false);
+          return;
         }
-        setIsTransactionPending(false);
-        await getIntegrationStatus();
-      } catch (error) {
-        setIsTransactionPending(false);
-        console.error(error);
+        const newStatus = parseInt((actionKey as string).split("-")[1], 10);
+        const tx = await contract.updateIRStatus(index, newStatus);
+        await tx.wait();
       }
-    },
-    [signer, getIntegrationStatus],
-  );
+      setIsTransactionPending(false);
+      await getIntegrationStatus();
+    } catch (error) {
+      setIsTransactionPending(false);
+      console.error(error);
+    }
+  }
 
   const hasSearchFilter = Boolean(filterValue);
 
@@ -267,94 +290,87 @@ export default function IntegrationsPage() {
     });
   }, [sortDescriptor, items]);
 
-  // --- Styling fix: remove "text-white" in favor of "text-gray-900 dark:text-gray-100"
-  const renderCell = useCallback(
-    (user: IntegrationRequest, columnKey: ColumnKey): ReactNode => {
-      const cellValue = user[columnKey as keyof IntegrationRequest];
-      switch (columnKey) {
-        case "id":
-          return (
-            <div className="flex flex-col text-gray-900 dark:text-gray-100">
-              <p className="text-sm font-bold">{user.id}</p>
-            </div>
-          );
-        case "votes":
-          return (
-            <div className="flex flex-col text-gray-900 dark:text-gray-100">
-              <p className="text-sm font-bold">{user.votes.toString()}</p>
-            </div>
-          );
-        case "title":
-          return (
-            <div className="flex flex-col text-gray-900 dark:text-gray-100">
-              <p className="text-sm font-semibold">{user.title}</p>
-            </div>
-          );
-        case "status":
-          return (
-            <Chip
-              className="capitalize gap-1 text-gray-900 dark:text-gray-100"
-              color={statusColorMap[user.status as StatusColorKey]}
-              size="sm"
-              variant="dot"
+  function renderCell(user: IntegrationRequest, columnKey: ColumnKey): ReactNode {
+    const cellValue = user[columnKey as keyof IntegrationRequest];
+    switch (columnKey) {
+      case "id":
+        return (
+          <div className="flex flex-col text-gray-900 dark:text-gray-100">
+            <p className="text-sm font-bold">{user.id}</p>
+          </div>
+        );
+      case "votes":
+        return (
+          <div className="flex flex-col text-gray-900 dark:text-gray-100">
+            <p className="text-sm font-bold">{user.votes.toString()}</p>
+          </div>
+        );
+      case "title":
+        return (
+          <div className="flex flex-col text-gray-900 dark:text-gray-100">
+            <p className="text-sm font-semibold">{user.title}</p>
+          </div>
+        );
+      case "status":
+        return (
+          <Chip
+            className="capitalize gap-1 text-gray-900 dark:text-gray-100"
+            color={statusColorMap[user.status as StatusColorKey]}
+            size="sm"
+            variant="dot"
+          >
+            {user.status}
+          </Chip>
+        );
+      case "actions":
+        return (
+          <div className="relative flex justify-end items-center gap-2 text-gray-900 dark:text-gray-100">
+            <Dropdown
+              className="border-1 border-default-200"
+              placement="bottom-end"
             >
-              {user.status}
-            </Chip>
-          );
-        case "actions":
-          return (
-            <div className="relative flex justify-end items-center gap-2 text-gray-900 dark:text-gray-100">
-              <Dropdown
-                className="border-1 border-default-200"
-                // improved background for dropdown
-                placement="bottom-end"
+              <DropdownTrigger>
+                <Button isIconOnly radius="full" size="sm" variant="light">
+                  <VerticalDotsIcon
+                    className="text-gray-900 dark:text-gray-200"
+                    width={undefined}
+                    height={undefined}
+                  />
+                </Button>
+              </DropdownTrigger>
+              <DropdownMenu
+                aria-label="Integration actions"
+                onAction={(key) => handleIntegrationAction(key, user.id)}
+                className="bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
               >
-                <DropdownTrigger>
-                  <Button isIconOnly radius="full" size="sm" variant="light">
-                    <VerticalDotsIcon
-                      className="text-gray-900 dark:text-gray-200"
-                      width={undefined}
-                      height={undefined}
-                    />
-                  </Button>
-                </DropdownTrigger>
-                <DropdownMenu
-                  aria-label="Integration actions"
-                  onAction={(key) => handleIntegrationAction(key, user.id)}
-                  // improved design for clearer dropdown
-                  className="bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
-                >
-                  <DropdownItem key="upvote">Up Vote</DropdownItem>
-                  <DropdownItem key="status-0">Change to NEW</DropdownItem>
-                  <DropdownItem key="status-1">Change to IN_REVIEW</DropdownItem>
-                  <DropdownItem key="status-2">Change to DEFERRED</DropdownItem>
-                  <DropdownItem key="status-3">Change to DONE</DropdownItem>
-                  <DropdownItem key="status-4">Change to REJ</DropdownItem>
-                  <DropdownItem key="status-5">Change to HIDE</DropdownItem>
-                </DropdownMenu>
-              </Dropdown>
-            </div>
-          );
-        default:
-          return (
-            <span className="text-gray-900 dark:text-gray-100">{cellValue}</span>
-          );
-      }
-    },
-    [handleIntegrationAction],
-  );
+                <DropdownItem key="upvote">Up Vote</DropdownItem>
+                <DropdownItem key="status-0">Change to NEW</DropdownItem>
+                <DropdownItem key="status-1">Change to IN_REVIEW</DropdownItem>
+                <DropdownItem key="status-2">Change to DEFERRED</DropdownItem>
+                <DropdownItem key="status-3">Change to DONE</DropdownItem>
+                <DropdownItem key="status-4">Change to REJ</DropdownItem>
+                <DropdownItem key="status-5">Change to HIDE</DropdownItem>
+              </DropdownMenu>
+            </Dropdown>
+          </div>
+        );
+      default:
+        return (
+          <span className="text-gray-900 dark:text-gray-100">{cellValue}</span>
+        );
+    }
+  }
 
-  const onRowsPerPageChange = useCallback((e: ChangeEvent<HTMLSelectElement>) => {
+  function onRowsPerPageChange(e: ChangeEvent<HTMLSelectElement>) {
     setRowsPerPage(Number(e.target.value));
     setPage(1);
-  }, []);
+  }
 
-  const onSearchChange = useCallback((value: string) => {
+  function onSearchChange(value: string) {
     setFilterValue(value);
     setPage(1);
-  }, []);
+  }
 
-  // --- Table top content (with improved text color for dropdowns, etc.)
   const topContent = useMemo(() => {
     return (
       <div className="flex flex-col gap-4">
@@ -464,12 +480,10 @@ export default function IntegrationsPage() {
     statusFilter,
     visibleColumns,
     onSearchChange,
-    onRowsPerPageChange,
     users.length,
     onIntegrationModalOpen,
   ]);
 
-  // --- Table bottom content
   const bottomContent = useMemo(() => {
     const currentItemsCount =
       selectedKeys === "all" ? items.length : selectedKeys.size;
@@ -495,12 +509,16 @@ export default function IntegrationsPage() {
     );
   }, [selectedKeys, items, page, pages]);
 
-  // --- Adjust table classes to have a light background and dark-mode alternative
   const classNames = useMemo(() => {
     return {
       wrapper: ["max-h-[382px]", "w-[90vw]"],
       table: "bg-white dark:bg-[#1f1f1f]",
-      th: ["bg-transparent", "border-b", "border-divider", "text-gray-900 dark:text-gray-100"],
+      th: [
+        "bg-transparent",
+        "border-b",
+        "border-divider",
+        "text-gray-900 dark:text-gray-100",
+      ],
       td: [
         "border-b",
         "border-divider",
@@ -560,9 +578,7 @@ export default function IntegrationsPage() {
             {(item) => (
               <TableRow key={item.id}>
                 {(columnKey) => (
-                  <TableCell>
-                    {renderCell(item, columnKey as ColumnKey)}
-                  </TableCell>
+                  <TableCell>{renderCell(item, columnKey as ColumnKey)}</TableCell>
                 )}
               </TableRow>
             )}
