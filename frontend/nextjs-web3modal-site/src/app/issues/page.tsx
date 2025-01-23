@@ -145,7 +145,7 @@ export default function IssuesPage() {
   const [issueTitleValue, setIssueTitleValue] = useState<string>("");
   const [issueDescriptionValue, setIssueDescriptionValue] = useState<string>("");
 
-  // State to check if user is contract owner
+  // State to check if user is contract owner (for UI or logs)
   const [isOwner, setIsOwner] = useState<boolean>(false);
 
   useEffect(() => {
@@ -190,19 +190,9 @@ export default function IssuesPage() {
       });
       setPrRequests(mapped);
 
+      // Debug logs
       const owner = await contract.owner();
       const userAddr = await signer.getAddress();
-
-      // Debug logs
-      console.log("----- IssuesPage Debug -----");
-      console.log("Raw contract owner from contract:", owner);
-      console.log("Raw user address from signer:", userAddr);
-      console.log("Checksummed owner:", getAddress(owner));
-      console.log("Checksummed user:", getAddress(userAddr));
-      console.log(
-        "Comparing checksummed addresses: ",
-        getAddress(owner) === getAddress(userAddr),
-      );
 
       setIsOwner(getAddress(owner) === getAddress(userAddr));
     } catch (error) {
@@ -210,15 +200,22 @@ export default function IssuesPage() {
     }
   }
 
-  // REMOVED useCallback to ensure updated state is used
+  /**
+   * Updated approach:
+   * We do a real-time check of `contract.owner()` inside handlePRAction,
+   * ensuring we know at that moment if the user is the owner.
+   */
   async function handlePRAction(actionKey: Key, prId: string) {
-    console.log("handlePRAction => isOwner:", isOwner, "action:", actionKey);
-
     if (!signer) return;
 
     try {
       setIsTransactionPending(true);
+
       const contract = new ethers.Contract(CONTRACT_ADDRESS, abi, signer);
+      // Re-check ownership right now
+      const owner = await contract.owner();
+      const userAddr = await signer.getAddress();
+      const localIsOwner = getAddress(owner) === getAddress(userAddr);
 
       const index = parseIssueId(prId);
 
@@ -226,7 +223,7 @@ export default function IssuesPage() {
         const tx = await contract.upVotePR(index);
         await tx.wait();
       } else if ((actionKey as string).startsWith("status-")) {
-        if (!isOwner) {
+        if (!localIsOwner) {
           alert("Only the owner can change the status");
           setIsTransactionPending(false);
           return;
@@ -235,6 +232,7 @@ export default function IssuesPage() {
         const tx = await contract.updatePRStatus(index, newStatus);
         await tx.wait();
       }
+
       setIsTransactionPending(false);
       await getProblemReports();
     } catch (error) {

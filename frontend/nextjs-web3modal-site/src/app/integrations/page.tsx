@@ -147,7 +147,7 @@ export default function IntegrationsPage() {
     "",
   );
 
-  // State to track if connected user is owner
+  // State to track if connected user is owner (for UI display)
   const [isOwner, setIsOwner] = useState<boolean>(false);
 
   useEffect(() => {
@@ -192,19 +192,10 @@ export default function IntegrationsPage() {
 
       setUsers(mapped);
 
+      // Debug logs
       const owner = await contract.owner();
       const userAddr = await signer.getAddress();
 
-      // Debug logs
-      console.log("----- IntegrationsPage Debug -----");
-      console.log("Raw contract owner from contract:", owner);
-      console.log("Raw user address from signer:", userAddr);
-      console.log("Checksummed owner:", getAddress(owner));
-      console.log("Checksummed user:", getAddress(userAddr));
-      console.log(
-        "Comparing checksummed addresses: ",
-        getAddress(owner) === getAddress(userAddr),
-      );
 
       setIsOwner(getAddress(owner) === getAddress(userAddr));
     } catch (error) {
@@ -212,14 +203,23 @@ export default function IntegrationsPage() {
     }
   }
 
-  // REMOVED useCallback to ensure updated state is used
+  /**
+   * Updated approach:
+   * Instead of relying solely on the isOwner state,
+   * we also do an immediate contract.owner() check
+   * when changing status, ensuring real-time correctness.
+   */
   async function handleIntegrationAction(actionKey: Key, integrationId: string) {
-    console.log("handleIntegrationAction => isOwner:", isOwner, "action:", actionKey);
-
     if (!signer) return;
+
     try {
       setIsTransactionPending(true);
+
+      // Re-check ownership at the moment of action
       const contract = new ethers.Contract(CONTRACT_ADDRESS, abi, signer);
+      const owner = await contract.owner();
+      const userAddr = await signer.getAddress();
+      const localIsOwner = getAddress(owner) === getAddress(userAddr);
 
       const index = parseIntegrationId(integrationId);
 
@@ -227,7 +227,7 @@ export default function IntegrationsPage() {
         const tx = await contract.upVoteIR(index);
         await tx.wait();
       } else if ((actionKey as string).startsWith("status-")) {
-        if (!isOwner) {
+        if (!localIsOwner) {
           alert("Only the owner can change the status");
           setIsTransactionPending(false);
           return;
@@ -325,10 +325,7 @@ export default function IntegrationsPage() {
       case "actions":
         return (
           <div className="relative flex justify-end items-center gap-2 text-gray-900 dark:text-gray-100">
-            <Dropdown
-              className="border-1 border-default-200"
-              placement="bottom-end"
-            >
+            <Dropdown className="border-1 border-default-200" placement="bottom-end">
               <DropdownTrigger>
                 <Button isIconOnly radius="full" size="sm" variant="light">
                   <VerticalDotsIcon
@@ -404,9 +401,7 @@ export default function IntegrationsPage() {
                 disallowEmptySelection
                 aria-label="Table Columns"
                 closeOnSelect={false}
-                selectedKeys={
-                  statusFilter === "all" ? new Set<string>() : statusFilter
-                }
+                selectedKeys={statusFilter === "all" ? new Set<string>() : statusFilter}
                 selectionMode="multiple"
                 onSelectionChange={(keys) => setStatusFilter(keys as Set<string>)}
                 className="bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
@@ -435,9 +430,7 @@ export default function IntegrationsPage() {
                 closeOnSelect={false}
                 selectedKeys={visibleColumns}
                 selectionMode="multiple"
-                onSelectionChange={(keys) =>
-                  setVisibleColumns(keys as Set<ColumnKey>)
-                }
+                onSelectionChange={(keys) => setVisibleColumns(keys as Set<ColumnKey>)}
                 className="bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
               >
                 {columns.map((column) => (
